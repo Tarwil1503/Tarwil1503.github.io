@@ -5,7 +5,7 @@
  *
  * Source by tickle
  * Created : 2019/11/19
- * Revised : 2021/11/24 (v24.3.0)
+ * Revised : 2021/12/11 (v24.5.0)
  *
  * https://github.com/cwtickle/danoniplus
  */
@@ -411,6 +411,7 @@ const g_stateObj = {
     d_background: C_FLG_ON,
     d_special: C_FLG_ON,
     appearance: `Visible`,
+    filterLock: C_FLG_OFF,
     opacity: 100,
 
     rotateEnabled: true,
@@ -489,6 +490,9 @@ const g_settings = {
 
     appearances: [`Visible`, `Hidden`, `Hidden+`, `Sudden`, `Sudden+`, `Hid&Sud+`],
     appearanceNum: 0,
+
+    filterLocks: [C_FLG_OFF, C_FLG_ON],
+    filterLockNum: 0,
 
     opacitys: [10, 25, 50, 75, 100],
 
@@ -972,6 +976,8 @@ const g_shortcutObj = {
     },
     keyConfig: {
         Escape: { id: `btnBack` },
+        Backspace_Enter: { id: `btnPlay` },
+        Backspace_NumpadEnter: { id: `btnPlay` },
     },
     loadingIos: {
         Enter: { id: `btnPlay` },
@@ -1011,7 +1017,7 @@ const g_btnPatterns = {
     difSelector: {},
     settingsDisplay: { Back: 0, KeyConfig: 0, Play: 0, Save: -10, Settings: -5 },
     loadingIos: { Play: 0 },
-    keyConfig: { Back: -3 },
+    keyConfig: { Back: -3, Play: 0 },
     result: { Back: -5, Copy: -5, Tweet: -5, Gitter: -5, Retry: 0 },
 };
 
@@ -1934,30 +1940,40 @@ const g_keyObj = {
         'Cross': [1, 1, -1, -1, -1, -1, -1, 1, 1],
         'Split': [1, 1, 1, 1, -1, -1, -1, -1, -1],
         'Alternate': [1, -1, 1, -1, 1, -1, 1, -1, 1],
+        'Twist': [1, 1, -1, -1, -1, 1, 1, -1, -1],
+        'Asymmetry': [1, -1, -1, 1, -1, -1, 1, 1, -1],
     },
     scrollDir9A_1: {
         '---': [1, 1, 1, 1, 1, 1, 1, 1, 1],
         'Cross': [1, 1, -1, -1, -1, -1, -1, 1, 1],
         'Split': [1, 1, 1, 1, -1, -1, -1, -1, -1],
         'Alternate': [1, -1, 1, -1, 1, -1, 1, -1, 1],
+        'Twist': [1, 1, -1, -1, -1, 1, 1, -1, -1],
+        'Asymmetry': [1, -1, -1, 1, -1, -1, 1, 1, -1],
     },
     scrollDir9A_2: {
         '---': [1, 1, 1, 1, 1, 1, 1, 1, 1],
         'Cross': [1, 1, -1, -1, -1, -1, -1, 1, 1],
         'Split': [1, 1, 1, 1, -1, -1, -1, -1, -1],
         'Alternate': [1, -1, 1, -1, 1, -1, 1, -1, 1],
+        'Twist': [1, 1, -1, -1, -1, 1, 1, -1, -1],
+        'Asymmetry': [1, -1, -1, 1, -1, -1, 1, 1, -1],
     },
     scrollDir9A_3: {
         '---': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         'Cross': [1, 1, 1, -1, -1, -1, -1, -1, 1, 1, 1],
         'Split': [1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1],
         'Alternate': [1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1],
+        'Twist': [1, 1, 1, -1, -1, -1, 1, 1, 1, -1, -1],
+        'Asymmetry': [1, -1, 1, -1, 1, -1, -1, 1, -1, 1, -1],
     },
     scrollDir9A_4: {
         '---': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         'Cross': [1, 1, 1, -1, -1, -1, -1, -1, 1, 1, 1],
         'Split': [1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1],
         'Alternate': [1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1],
+        'Twist': [1, 1, 1, -1, -1, -1, 1, 1, 1, -1, -1],
+        'Asymmetry': [1, -1, 1, -1, 1, -1, -1, 1, -1, 1, -1],
     },
 
     scrollDir9B_0: {
@@ -1965,24 +1981,32 @@ const g_keyObj = {
         'Cross': [1, 1, -1, -1, -1, -1, -1, 1, 1],
         'Split': [1, 1, 1, 1, -1, -1, -1, -1, -1],
         'Alternate': [1, -1, 1, -1, 1, -1, 1, -1, 1],
+        'Twist': [1, 1, -1, -1, -1, 1, 1, -1, -1],
+        'Asymmetry': [1, -1, -1, 1, -1, -1, 1, 1, -1],
     },
     scrollDir9B_1: {
         '---': [1, 1, 1, 1, 1, 1, 1, 1, 1],
         'Cross': [1, 1, -1, -1, -1, -1, -1, 1, 1],
         'Split': [1, 1, 1, 1, -1, -1, -1, -1, -1],
         'Alternate': [1, -1, 1, -1, 1, -1, 1, -1, 1],
+        'Twist': [1, 1, -1, -1, -1, 1, 1, -1, -1],
+        'Asymmetry': [1, -1, -1, 1, -1, -1, 1, 1, -1],
     },
     scrollDir9B_2: {
         '---': [1, 1, 1, 1, 1, 1, 1, 1, 1],
         'Cross': [1, 1, -1, -1, -1, -1, -1, 1, 1],
         'Split': [1, 1, 1, 1, -1, -1, -1, -1, -1],
         'Alternate': [1, -1, 1, -1, 1, -1, 1, -1, 1],
+        'Twist': [1, 1, -1, -1, -1, 1, 1, -1, -1],
+        'Asymmetry': [1, -1, -1, 1, -1, -1, 1, 1, -1],
     },
     scrollDir9i_1: {
         '---': [1, 1, 1, 1, 1, 1, 1, 1, 1],
         'Cross': [1, 1, -1, -1, -1, -1, -1, 1, 1],
         'Split': [1, 1, 1, 1, -1, -1, -1, -1, -1],
         'Alternate': [1, -1, 1, -1, 1, -1, 1, -1, 1],
+        'Twist': [1, 1, -1, -1, 1, 1, 1, -1, -1],
+        'Asymmetry': [1, -1, -1, 1, -1, -1, 1, 1, -1],
     },
 
     scrollDir11_0: {
@@ -2061,12 +2085,16 @@ const g_keyObj = {
         'Cross': [1, 1, 1, -1, -1, -1, -1, -1, 1, 1, 1],
         'Split': [1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1],
         'Alternate': [1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1],
+        'Twist': [1, 1, 1, -1, -1, -1, 1, 1, 1, -1, -1],
+        'Asymmetry': [1, -1, 1, -1, 1, -1, -1, 1, -1, 1, -1],
     },
     scrollDir11i_1: {
         '---': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         'Cross': [1, 1, 1, -1, -1, -1, -1, -1, 1, 1, 1],
         'Split': [1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1],
         'Alternate': [1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1],
+        'Twist': [1, 1, 1, -1, -1, -1, 1, 1, 1, -1, -1],
+        'Asymmetry': [1, -1, 1, -1, 1, -1, -1, 1, -1, 1, -1],
     },
 
     scrollDir12_0: {
@@ -2204,7 +2232,7 @@ keyCtrlName.forEach(property => g_keyObj[`${property}d`] = copyArray2d(g_keyObj[
 const g_keyCopyLists = {
     simpleDef: [`blank`, `scale`],
     simple: [`div`, `blank`, `scale`, `keyRetry`, `keyTitleBack`, `transKey`, `scrollDir`, `assistPos`],
-    multiple: [`chara`, `color`, `stepRtn`, `pos`, `shuffle`, `scrollDir`, `assistPos`],
+    multiple: [`chara`, `color`, `stepRtn`, `pos`, `shuffle`],
 };
 
 // タイトル画面関連のリスト群
@@ -2526,10 +2554,12 @@ const g_lblNameObj = {
     multi: `x`,
     frame: `f`,
     percent: `%`,
+    filterLock: `Lock`,
 
     sc_speed: `←→`,
     sc_scroll: `R/↑↓`,
     sc_adjustment: `- +`,
+    sc_keyConfigPlay: g_isMac ? `Del+Enter` : `BS+Enter`,
 
     g_start: `Start`,
     g_border: `Border`,
