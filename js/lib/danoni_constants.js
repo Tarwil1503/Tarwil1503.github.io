@@ -5,7 +5,7 @@
  *
  * Source by tickle
  * Created : 2019/11/19
- * Revised : 2021/12/11 (v24.5.0)
+ * Revised : 2022/01/22 (v25.4.0)
  *
  * https://github.com/cwtickle/danoniplus
  */
@@ -197,16 +197,16 @@ let g_imgExtensions = [`png`, `gif`, `bmp`, `jpg`, `jpeg`, `svg`];
 // オブジェクト種別
 const g_typeLists = {
     arrow: [`arrow`, `dummyArrow`, `frz`, `dummyFrz`],
-    color: [`color`, `acolor`, `shadowColor`, `ashadowColor`],
+    color: [`color`, `acolor`],
     frzColor: [`Normal`, `NormalBar`, `Hit`, `HitBar`],
     dataList: [
         `Arrow`, `FrzArrow`, `FrzLength`,
-        `Color`, `ColorCd`, `FColor`, `FColorCd`,
-        `AColor`, `AColorCd`, `FAColor`, `FAColorCd`,
-        `shadowColor`, `shadowColorCd`, `FshadowColor`, `FshadowColorCd`,
-        `AshadowColor`, `AshadowColorCd`, `FAshadowColor`, `FAshadowColorCd`,
+        `Color`, `ColorCd`,
+        `FColorNormal`, `FColorNormalCd`, `FColorNormalBar`, `FColorNormalBarCd`,
+        `FColorHit`, `FColorHitCd`, `FColorHitBar`, `FColorHitBarCd`,
         `ArrowCssMotion`, `ArrowCssMotionName`,
         `FrzCssMotion`, `FrzCssMotionName`,
+        `ArrowColorChangeAll`, `FrzColorChangeAll`,
     ],
 };
 
@@ -502,6 +502,15 @@ const g_settings = {
 
 g_settings.volumeNum = g_settings.volumes.length - 1;
 g_settings.opacityNum = g_settings.opacitys.length - 1;
+
+/**
+ * 設定画面間移動
+ */
+const g_jumpSettingWindow = {
+    option: _ => settingsDisplayInit(),
+    difSelector: _ => settingsDisplayInit(),
+    settingsDisplay: _ => optionInit(),
+};
 
 /**
  * シャッフル適用関数
@@ -1663,10 +1672,10 @@ const g_keyObj = {
     keyCtrl12_0: [[85, 0], [73, 0], [56, 57], [79, 0], [32, 0], [78, 0], [74, 0], [77, 0], [75, 0], [188, 0], [76, 0], [190, 0]],
     keyCtrl13_0: [[37, 0], [40, 0], [38, 0], [39, 0], [83, 0], [68, 0], [69, 82], [70, 0], [32, 0], [74, 0], [75, 0], [73, 0], [76, 0]],
     keyCtrl14_0: [[84, 89], [85, 0], [73, 0], [56, 55, 57, 48], [79, 0], [192, 80], [32, 0], [78, 0], [74, 0], [77, 0], [75, 0], [188, 0], [76, 0], [190, 0]],
-    keyCtrl14i_0: [[90, 0], [88, 0], [67, 0], [37, 0], [40, 0], [38, 0], [39, 0], [83, 0], [68, 0], [70, 0], [32, 0], [74, 0], [75, 0], [76, 0]],
+    keyCtrl14i_0: [[90, 87], [88, 69], [67, 82], [37, 0], [40, 0], [38, 0], [39, 0], [83, 0], [68, 0], [70, 0], [32, 0], [74, 0], [75, 0], [76, 0]],
     keyCtrl15A_0: [[87, 0], [69, 0], [51, 52], [82, 0], [37, 0], [40, 0], [38, 0], [39, 0], [83, 0], [68, 0], [70, 0], [32, 0], [74, 0], [75, 0], [76, 0]],
     keyCtrl15B_0: [[87, 0], [69, 0], [51, 52], [82, 0], [85, 0], [73, 0], [56, 57], [79, 0], [83, 0], [68, 0], [70, 0], [32, 0], [74, 0], [75, 0], [76, 0]],
-    keyCtrl16i_0: [[90, 0], [88, 0], [67, 0], [37, 0], [40, 0], [38, 0], [39, 0], [65, 0], [83, 0], [68, 0], [70, 0], [32, 0], [74, 0], [75, 0], [76, 0], [187, 0]],
+    keyCtrl16i_0: [[90, 87], [88, 69], [67, 82], [37, 0], [40, 0], [38, 0], [39, 0], [65, 0], [83, 0], [68, 0], [70, 0], [32, 0], [74, 0], [75, 0], [76, 0], [187, 0]],
     keyCtrl17_0: [[65, 0], [90, 0], [83, 0], [88, 0], [68, 0], [67, 0], [70, 0], [86, 0], [32, 0], [78, 0], [74, 0], [77, 0], [75, 0], [188, 0], [76, 0], [190, 0], [187, 0]],
     keyCtrl23_0: [[87, 0], [69, 0], [51, 52], [82, 0], [85, 0], [73, 0], [56, 57], [79, 0],
     [90, 0], [83, 0], [88, 0], [68, 0], [67, 0], [70, 0], [86, 0], [32, 0], [78, 0], [74, 0], [77, 0], [75, 0], [188, 0], [76, 0], [190, 0]],
@@ -2117,6 +2126,7 @@ const g_keyObj = {
     scrollDir13_0: {
         '---': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         'Flat': [1, 1, 1, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+        'Cross': [-1, -1, -1, -1, 1, 1, 1, 1, -1, -1, -1, -1, -1],
     },
     scrollDir14_0: {
         '---': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -2252,6 +2262,22 @@ const g_titleLists = {
 };
 
 const g_animationData = [`back`, `mask`];
+
+let g_fadeinStockList = [`word`, `back`, `mask`];
+
+/** フェードイン時でもプリロードを除外しないリスト */
+const g_preloadExceptList = {
+    word: [`[left]`, `[center]`, `[right]`],
+    back: [],
+    mask: [],
+};
+
+/** フェードイン時、プリロードを強制削除するリスト（初期値は空） */
+const g_stockForceDelList = {
+    word: [],
+    back: [],
+    mask: [],
+};
 
 /**
  * データ種, 最小データ長のセット
@@ -2410,6 +2436,7 @@ const g_lang_msgInfoObj = {
         W_0012: `現在の設定では音源再生方法により小数の Adjustment が利用できません。<br>
         また、Fadein を使用した場合は通常よりズレが発生することがあります。<br>
         音源ファイルを js/txt 化するか、サーバー上動作とすれば解消します。(W-0012)`,
+        W_0021: `クリップボードのコピーに失敗しました。`,
 
         E_0011: `アーティスト名が未入力です。(E-0011)`,
         E_0012: `曲名情報が未設定です。(E-0012)<br>
@@ -2456,6 +2483,7 @@ const g_lang_msgInfoObj = {
         Also, if you use "Fadein", it may be out of alignment.<br>
         It can be solved by converting the sound source file to encoded data (js, txt) or 
         operating it on the server. (W-0012)`,
+        W_0021: `Failed to copy the clipboard.`,
 
         E_0011: `The artist name is not set. (E-0011)`,
         E_0012: `The song title information is not set. (E-0012)<br>
@@ -2592,6 +2620,8 @@ const g_lblNameObj = {
 
     'u_x': `x`,
     'u_%': `%`,
+    'u_key': `key`,
+    'u_k-': `k-`,
 
     'u_OFF': `OFF`,
     'u_ON': `ON`,
@@ -2874,4 +2904,250 @@ const g_errMsgObj = {
     loading: [],
     main: [],
     result: [],
+};
+
+/**
+ * カスタム関数の定義
+ * - 挿入場所ごとに名前を分けて定義
+ */
+const g_customJsObj = {
+    title: [],
+    titleEnterFrame: [],
+    option: [],
+    difficulty: [],
+    settingsDisplay: [],
+    keyconfig: [],
+
+    preloading: [],
+    loading: [],
+    progress: [],
+    main: [],
+    dummyArrow: [],
+    dummyFrz: [],
+
+    judg_ii: [],
+    judg_shakin: [],
+    judg_matari: [],
+    judg_shobon: [],
+    judg_uwan: [],
+    judg_kita: [],
+    judg_iknai: [],
+
+    mainEnterFrame: [],
+    result: [],
+    resultEnterFrame: [],
+};
+
+/**
+ * スキン関数の定義
+ * - 挿入場所ごとに名前を分けて定義
+ */
+const g_skinJsObj = {
+    title: [],
+    option: [],
+    settingsDisplay: [],
+    keyconfig: [],
+
+    preloading: [],
+    loading: [],
+    main: [],
+    result: [],
+};
+
+/**
+ * 従来のカスタム関数をg_customJsObj, g_skinJsObjへ追加
+ * - customjsファイルを読み込んだ直後にこの関数を呼び出している
+ */
+const loadLegacyCustomFunc = _ => {
+
+    // タイトル
+    if (typeof customTitleInit === C_TYP_FUNCTION) {
+        g_customJsObj.title.push(customTitleInit);
+    }
+    if (typeof customTitleInit2 === C_TYP_FUNCTION) {
+        g_customJsObj.title.push(customTitleInit2);
+    }
+    if (typeof customTitleEnterFrame === C_TYP_FUNCTION) {
+        g_customJsObj.titleEnterFrame.push(customTitleEnterFrame);
+    }
+    if (typeof customTitleEnterFrame2 === C_TYP_FUNCTION) {
+        g_customJsObj.titleEnterFrame.push(customTitleEnterFrame2);
+    }
+    if (typeof skinTitleInit === C_TYP_FUNCTION) {
+        g_skinJsObj.title.push(skinTitleInit);
+    }
+    if (typeof skinTitleInit2 === C_TYP_FUNCTION) {
+        g_skinJsObj.title.push(skinTitleInit2);
+    }
+
+    // 主要設定
+    if (typeof customOptionInit === C_TYP_FUNCTION) {
+        g_customJsObj.option.push(customOptionInit);
+    }
+    if (typeof customOptionInit2 === C_TYP_FUNCTION) {
+        g_customJsObj.option.push(customOptionInit2);
+    }
+    if (typeof skinOptionInit === C_TYP_FUNCTION) {
+        g_skinJsObj.option.push(skinOptionInit);
+    }
+    if (typeof skinOptionInit2 === C_TYP_FUNCTION) {
+        g_skinJsObj.option.push(skinOptionInit2);
+    }
+
+    if (typeof customSetDifficulty === C_TYP_FUNCTION) {
+        g_customJsObj.difficulty.push(customSetDifficulty);
+    }
+    if (typeof customSetDifficulty2 === C_TYP_FUNCTION) {
+        g_customJsObj.difficulty.push(customSetDifficulty2);
+    }
+
+    // ディスプレイ設定
+    if (typeof customSettingsDisplayInit === C_TYP_FUNCTION) {
+        g_customJsObj.settingsDisplay.push(customSettingsDisplayInit);
+    }
+    if (typeof customSettingsDisplayInit2 === C_TYP_FUNCTION) {
+        g_customJsObj.settingsDisplay.push(customSettingsDisplayInit2);
+    }
+    if (typeof skinSettingsDisplayInit === C_TYP_FUNCTION) {
+        g_skinJsObj.settingsDisplay.push(skinSettingsDisplayInit);
+    }
+    if (typeof skinSettingsDisplayInit2 === C_TYP_FUNCTION) {
+        g_skinJsObj.settingsDisplay.push(skinSettingsDisplayInit2);
+    }
+
+    // キーコンフィグ
+    if (typeof customKeyConfigInit === C_TYP_FUNCTION) {
+        g_customJsObj.keyconfig.push(customKeyConfigInit);
+    }
+    if (typeof customKeyConfigInit2 === C_TYP_FUNCTION) {
+        g_customJsObj.keyconfig.push(customKeyConfigInit2);
+    }
+    if (typeof skinKeyConfigInit === C_TYP_FUNCTION) {
+        g_skinJsObj.keyconfig.push(skinKeyConfigInit);
+    }
+    if (typeof skinKeyConfigInit2 === C_TYP_FUNCTION) {
+        g_skinJsObj.keyconfig.push(skinKeyConfigInit2);
+    }
+
+    // ローディング
+    if (typeof customPreloadingInit === C_TYP_FUNCTION) {
+        g_customJsObj.preloading.push(customPreloadingInit);
+    }
+    if (typeof customPreloadingInit2 === C_TYP_FUNCTION) {
+        g_customJsObj.preloading.push(customPreloadingInit2);
+    }
+    if (typeof skinPreloadingInit === C_TYP_FUNCTION) {
+        g_skinJsObj.preloading.push(skinPreloadingInit);
+    }
+    if (typeof skinPreloadingInit2 === C_TYP_FUNCTION) {
+        g_skinJsObj.preloading.push(skinPreloadingInit2);
+    }
+    if (typeof customLoadingInit === C_TYP_FUNCTION) {
+        g_customJsObj.loading.push(customLoadingInit);
+    }
+    if (typeof customLoadingInit2 === C_TYP_FUNCTION) {
+        g_customJsObj.loading.push(customLoadingInit2);
+    }
+    if (typeof customLoadingProgress === C_TYP_FUNCTION) {
+        g_customJsObj.progress.push(customLoadingProgress);
+    }
+    if (typeof customLoadingProgress2 === C_TYP_FUNCTION) {
+        g_customJsObj.progress.push(customLoadingProgress2);
+    }
+
+    // メイン
+    if (typeof customMainInit === C_TYP_FUNCTION) {
+        g_customJsObj.main.push(customMainInit);
+    }
+    if (typeof customMainInit2 === C_TYP_FUNCTION) {
+        g_customJsObj.main.push(customMainInit2);
+    }
+    if (typeof customJudgeDummyArrow === C_TYP_FUNCTION) {
+        g_customJsObj.dummyArrow.push(customJudgeDummyArrow);
+    }
+    if (typeof customJudgeDummyArrow2 === C_TYP_FUNCTION) {
+        g_customJsObj.dummyArrow.push(customJudgeDummyArrow2);
+    }
+    if (typeof customJudgeDummyFrz === C_TYP_FUNCTION) {
+        g_customJsObj.dummyFrz.push(customJudgeDummyFrz);
+    }
+    if (typeof customJudgeDummyFrz2 === C_TYP_FUNCTION) {
+        g_customJsObj.dummyFrz.push(customJudgeDummyFrz2);
+    }
+    if (typeof customMainEnterFrame === C_TYP_FUNCTION) {
+        g_customJsObj.mainEnterFrame.push(customMainEnterFrame);
+    }
+    if (typeof customMainEnterFrame2 === C_TYP_FUNCTION) {
+        g_customJsObj.mainEnterFrame.push(customMainEnterFrame2);
+    }
+    if (typeof skinMainInit === C_TYP_FUNCTION) {
+        g_skinJsObj.main.push(skinMainInit);
+    }
+    if (typeof skinMainInit2 === C_TYP_FUNCTION) {
+        g_skinJsObj.main.push(skinMainInit2);
+    }
+
+    // 判定
+    if (typeof customJudgeIi === C_TYP_FUNCTION) {
+        g_customJsObj.judg_ii.push(customJudgeIi);
+    }
+    if (typeof customJudgeIi2 === C_TYP_FUNCTION) {
+        g_customJsObj.judg_ii.push(customJudgeIi2);
+    }
+    if (typeof customJudgeShakin === C_TYP_FUNCTION) {
+        g_customJsObj.judg_shakin.push(customJudgeShakin);
+    }
+    if (typeof customJudgeShakin2 === C_TYP_FUNCTION) {
+        g_customJsObj.judg_shakin.push(customJudgeShakin2);
+    }
+    if (typeof customJudgeMatari === C_TYP_FUNCTION) {
+        g_customJsObj.judg_matari.push(customJudgeMatari);
+    }
+    if (typeof customJudgeMatari2 === C_TYP_FUNCTION) {
+        g_customJsObj.judg_matari.push(customJudgeMatari2);
+    }
+    if (typeof customJudgeShobon === C_TYP_FUNCTION) {
+        g_customJsObj.judg_shobon.push(customJudgeShobon);
+    }
+    if (typeof customJudgeShobon2 === C_TYP_FUNCTION) {
+        g_customJsObj.judg_shobon.push(customJudgeShobon2);
+    }
+    if (typeof customJudgeUwan === C_TYP_FUNCTION) {
+        g_customJsObj.judg_uwan.push(customJudgeUwan);
+    }
+    if (typeof customJudgeUwan2 === C_TYP_FUNCTION) {
+        g_customJsObj.judg_uwan.push(customJudgeUwan2);
+    }
+    if (typeof customJudgeKita === C_TYP_FUNCTION) {
+        g_customJsObj.judg_kita.push(customJudgeKita);
+    }
+    if (typeof customJudgeKita2 === C_TYP_FUNCTION) {
+        g_customJsObj.judg_kita.push(customJudgeKita2);
+    }
+    if (typeof customJudgeIknai === C_TYP_FUNCTION) {
+        g_customJsObj.judg_iknai.push(customJudgeIknai);
+    }
+    if (typeof customJudgeIknai2 === C_TYP_FUNCTION) {
+        g_customJsObj.judg_iknai.push(customJudgeIknai2);
+    }
+
+    // リザルト
+    if (typeof customResultInit === C_TYP_FUNCTION) {
+        g_customJsObj.result.push(customResultInit);
+    }
+    if (typeof customResultInit2 === C_TYP_FUNCTION) {
+        g_customJsObj.result.push(customResultInit2);
+    }
+    if (typeof customResultEnterFrame === C_TYP_FUNCTION) {
+        g_customJsObj.resultEnterFrame.push(customResultEnterFrame);
+    }
+    if (typeof customResultEnterFrame2 === C_TYP_FUNCTION) {
+        g_customJsObj.resultEnterFrame.push(customResultEnterFrame2);
+    }
+    if (typeof skinResultInit === C_TYP_FUNCTION) {
+        g_skinJsObj.result.push(skinResultInit);
+    }
+    if (typeof skinResultInit2 === C_TYP_FUNCTION) {
+        g_skinJsObj.result.push(skinResultInit2);
+    }
 };
