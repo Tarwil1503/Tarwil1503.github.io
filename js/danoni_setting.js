@@ -1,7 +1,7 @@
 ﻿'use strict';
 /**
  * Dancing☆Onigiri 設定用jsファイル
- * Template Update: 2021/10/24 (v24.0.0)
+ * Template Update: 2022/01/22 (v25.4.0)
  * 
  * このファイルでは、作品全体に対しての初期設定を行うことができます。
  * 譜面データ側で個別に同様の項目が設定されている場合は、譜面データ側の設定が優先されます。
@@ -19,14 +19,20 @@ const g_presetTuningUrl = `https://www.google.co.jp/`;
 const g_presetSkinType = `default`;
 
 // 既定カスタムJs (デフォルトは danoni_custom.js)
-//const g_presetCustomJs = `danoni_custom.js`;
+//const g_presetCustomJs = `danoni_custom.js,danoni_init.js`;
+
+// 既定カスタムCss (デフォルトは指定なし、cssフォルダを参照)
+//const g_presetCustomCss = `danoni_custom.css`;
+
+// 背景・マスクモーションで使用する画像パスの指定方法を他の設定に合わせる設定 (trueで有効化)
+// const g_presetSyncBackPath = true;
 
 // ゲージ設定（デフォルト）
 const g_presetGauge = {
 	//	Border: 70,  // ノルマ制でのボーダーライン、ライフ制にしたい場合は `x` を指定
 	//	Recovery: 2, // 回復量
-	//	Damage: 100,   // ダメージ量
-	//	Init: 20,    // 初期値
+	//	Damage: 7,   // ダメージ量
+	//	Init: 25,    // 初期値
 };
 
 // フリーズアローのデフォルト色セットの利用有無 (true: 使用, false: 矢印色を優先してセット)
@@ -40,9 +46,9 @@ const g_presetGaugeCustom = {
 		Damage: 7,
 		Init: 25,
 	},
-	Heavy: {
+	Hard: {
 		Border: `x`,
-		Recovery: 2,
+		Recovery: 1,
 		Damage: 50,
 		Init: 100,
 	},
@@ -232,4 +238,19 @@ const g_lblRenames = {
 	main: true,
 	keyConfig: true,
 	result: true,
+};
+
+/**
+ * フェードイン時にそれ以前のデータを蓄積しない種別(word, back, mask)を指定
+ */
+const g_presetUnStockCategories = [];
+
+/** 
+ * フェードイン時、プリロードを強制削除するリスト（英字は小文字で指定）
+ * 指定例) back: [`fade`]   ※back_dataでアニメーション名に'fade'や'Fade'を含む
+ */
+const g_presetStockForceDelList = {
+	word: [],
+	back: [],
+	mask: [],
 };
