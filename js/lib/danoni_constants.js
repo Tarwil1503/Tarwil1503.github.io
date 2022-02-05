@@ -5,7 +5,7 @@
  *
  * Source by tickle
  * Created : 2019/11/19
- * Revised : 2022/01/26 (v25.5.1)
+ * Revised : 2022/02/05 (v26.1.0)
  *
  * https://github.com/cwtickle/danoniplus
  */
@@ -242,12 +242,17 @@ const C_LEN_GRAPH_HEIGHT = 226;
 const C_CLR_SPEEDGRAPH_SPEED = `#cc3333`;
 const C_CLR_SPEEDGRAPH_BOOST = `#999900`;
 const C_CLR_DENSITY_MAX = `#990000cc`;
-const C_CLR_DENSITY_MAX_JUMPS = `#660000cc`;
-const C_CLR_DENSITY_MAX_HANDS = `#330000cc`;
 const C_CLR_DENSITY_DEFAULT = `#999999cc`;
-const C_CLR_DENSITY_JUMPS = `#666666cc`;
-const C_CLR_DENSITY_HANDS = `#333333cc`;
 const C_LEN_DENSITY_DIVISION = 16;
+
+const g_graphColorObj = {
+    max: `#993333cc`,
+    default: `#999999cc`,
+    max2Push: `#9933cccc`,
+    default2Push: `#777777cc`,
+    max3Push: `#003399cc`,
+    default3Push: `#555555cc`,
+};
 
 const g_settingBtnObj = {
     chara: {
@@ -2393,7 +2398,7 @@ const g_escapeStr = {
     escapeTag: [
         [`*amp*`, `&amp;`], [`*pipe*`, `|`], [`*dollar*`, `$`], [`*rsquo*`, `&rsquo;`],
         [`*quot*`, `&quot;`], [`*comma*`, `&sbquo;`], [`*squo*`, `&#39;`], [`*bkquo*`, `&#96;`],
-        [`*lt*`, `&lt;`], [`*gt*`, `&gt;`],
+        [`*lt*`, `&lt;`], [`*gt*`, `&gt;`], [`*lbrace*`, `{`], [`*rbrace*`, `}`],
     ],
     unEscapeTag: [
         [`&amp;`, `&`], [`&rsquo;`, `’`], [`&quot;`, `"`], [`&sbquo;`, `,`],
