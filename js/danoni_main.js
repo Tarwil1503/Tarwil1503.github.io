@@ -8282,7 +8282,9 @@ function MainInit() {
 	const jdgMainScoreObj = {
 		Ii: [`ii`, 0], Shakin: [`shakin`, 1], Matari: [`matari`, 2], Shobon: [`shobon`, 3], Uwan: [`uwan`, 4],
 		MCombo: [`combo`, 5], Kita: [`kita`, 7], Iknai: [`iknai`, 8], FCombo: [`combo`, 9],
+		TRText: [`ii`, 12], TRatio: [`combo`, 13], KCText: [`uwan`, 14], KaRatio: [`combo`, 15], EAdjText: [`shakin`, 17], EstAdj: [`combo`, 18],
 	};
+
 	Object.keys(jdgMainScoreObj).forEach(jdgScore => {
 		infoSprite.appendChild(makeCounterSymbol(`lbl${jdgScore}`, g_headerObj.playingWidth - 110,
 			g_cssObj[`common_${jdgMainScoreObj[jdgScore][0]}`], jdgMainScoreObj[jdgScore][1] + 1, 0, g_workObj.scoreDisp));
@@ -8532,6 +8534,8 @@ function MainInit() {
 		arrowOFF: (_j, _arrowName, _cnt) => {
 			if (_cnt < (-1) * g_judgObj.arrowJ[g_judgPosObj.uwan]) {
 				g_workObj.diffListR.push(9);
+				lblTRatio.textContent = `${calculateTRatio()}%`;
+				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 				judgeUwan(_cnt);
 				judgeObjDelete.arrow(_j, _arrowName);
 			}
@@ -8584,6 +8588,8 @@ function MainInit() {
 		frzNG: (_j, _k, _frzName, _cnt) => {
 			if (_cnt < (-1) * g_judgObj.frzJ[g_judgPosObj.iknai]) {
 				g_workObj.diffListR.push(9);
+				lblTRatio.textContent = `${calculateTRatio()}%`;
+				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 				judgeIknai(_cnt);
 				g_attrObj[_frzName].judgEndFlg = true;
 
@@ -8602,6 +8608,8 @@ function MainInit() {
 			if (g_attrObj[_frzName].keyUpFrame > g_headerObj.frzAttempt) {
 				judgeIknai(_cnt);
 				g_workObj.diffListR.push(10);
+				lblTRatio.textContent = `${calculateTRatio()}%`;
+				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 				g_attrObj[_frzName].judgEndFlg = true;
 				changeFailedFrz(_j, _k);
 			}
@@ -8918,7 +8926,9 @@ function MainInit() {
 
 		const currentFrame = g_scoreObj.frameNum;
 		lblframe.textContent = currentFrame;
-
+		lblTRText.textContent = `T-Ratio`;
+		lblKCText.textContent = `辛判定`;
+		lblEAdjText.textContent = `推定Adj.`;
 		// キーの押下状態を取得
 		for (let j = 0; j < keyNum; j++) {
 			for (let m = 0; m < g_workObj.keyCtrlN[j].length; m++) {
@@ -9375,6 +9385,8 @@ function judgeArrow(_j) {
 		const _difCnt = Math.abs(_difFrame);
 		if (_difCnt <= g_judgObj.arrowJ[g_judgPosObj.uwan]) {
 			g_workObj.diffListR.push(_difCnt);
+			lblTRatio.textContent = `${calculateTRatio()}%`;
+			lblKaRatio.textContent = `${calculateKaRatio()}%`;
 			const [resultFunc, resultJdg] = checkJudgment(_difCnt);
 			resultFunc(_difFrame);
 			countFastSlow(_difFrame, g_headerObj.justFrames);
@@ -9395,9 +9407,6 @@ function judgeArrow(_j) {
 
 	const judgeTargetFrzArrow = _difFrame => {
 		const _difCnt = Math.abs(_difFrame);
-		if (_difCnt <= g_judgObj.frzJ[g_judgPosObj.iknai]) {
-			g_workObj.diffListR.push(_difCnt);
-		}
 		if (_difCnt <= g_judgObj.frzJ[g_judgPosObj.sfsf] && !g_attrObj[frzName].judgEndFlg) {
 			if (g_headerObj.frzStartjdgUse &&
 				(g_workObj.judgFrzHitCnt[_j] === undefined || g_workObj.judgFrzHitCnt[_j] <= fcurrentNo)) {
@@ -9405,6 +9414,11 @@ function judgeArrow(_j) {
 				resultFunc(_difFrame);
 				countFastSlow(_difFrame, g_headerObj.justFrames);
 				g_workObj.judgFrzHitCnt[_j] = fcurrentNo + 1;
+			}
+			if (g_attrObj[frzName].keyUpFrame === 0) {
+				g_workObj.diffListR.push(_difCnt);
+				lblTRatio.textContent = `${calculateTRatio()}%`;
+				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 			}
 			changeHitFrz(_j, fcurrentNo, `frz`);
 			return true;
@@ -9433,6 +9447,7 @@ function judgeArrow(_j) {
 function displayDiff(_difFrame, _justFrames = 0) {
 	let diffJDisp = ``;
 	g_workObj.diffList.push(_difFrame);
+	lblEstAdj.textContent = `${calculateEstAdj()}`;
 	const difCnt = Math.abs(_difFrame);
 	if (_difFrame > _justFrames) {
 		diffJDisp = `<span class="common_matari">Fast ${difCnt} Frames</span>`;
@@ -9663,6 +9678,90 @@ function finishViewing() {
 	}
 }
 
+	
+function calculateTRatio () {
+	function AppErfA (_argument) {
+		return 2 / (1 + Math.exp(-3.4 * _argument)) - 1;
+	}
+	
+	function factorial (_number) {
+		if (_number < 2) {
+			return 1;
+		}
+		return _number * factorial(_number - 1);
+	}
+	function AppErfB (_argument) {
+		let result = 0;
+		for (let j = 0; j < 20; j++){
+			result += ((-1) ** j) * (_argument ** (2*j+1)) /  (factorial(j) * (2*j + 1));
+		}
+		return 2 * result / Math.sqrt(Math.PI);
+	}
+	function erf(_argument) {
+		if (Math.abs(_argument) <= 2.5) {
+			return AppErfB (_argument);
+		} else {
+			return AppErfA (_argument);
+		}
+	}
+	function TarwilCalc (_difFrame) {
+		const _difCnt = Math.abs(_difFrame);
+		if (_difCnt === 0) {
+			return 2;
+		} else if (_difCnt <= 5) {
+			return (2 * erf((65-39*_difCnt/3)/22.7));
+		} else if (_difCnt <= 8){
+			return (-11 * (39*_difCnt/3 - 65) /230);
+		} else if (_difCnt === 9){
+			return -2.5;
+		} else if (_difCnt === 10){
+			return -1.7;
+		}
+	}
+	
+	let TC_sum = 0;
+	for (let j = 0; j < g_workObj.diffListR.length; j++) {
+	TC_sum += 50 * TarwilCalc(g_workObj.diffListR[j]);
+	}
+	const result = Math.round(TC_sum / g_workObj.diffListR.length * 100) / 100;
+	return result;
+}
+
+function calculateKaRatio () {
+	function KaCalc (_difFrame) {
+		const _difCnt = Math.abs(_difFrame);
+		if (_difCnt <= 1) {
+			return 100;
+		} else if (_difCnt <= 4) {
+			return 50;
+		} else {
+			return 0;
+		}
+	}
+	let KC_sum = 0;
+	for (let j = 0; j < g_workObj.diffListR.length; j++) {
+		KC_sum += KaCalc(g_workObj.diffListR[j]);
+	}
+	const result = Math.round(KC_sum / g_workObj.diffListR.length * 100) / 100;
+	return result;
+}
+
+function calculateEstAdj () {
+	const getSign = _val => (_val > 0 ? `+` : ``);
+	const getDiffFrame = _val => `${getSign(_val)}${_val}${g_lblNameObj.frame}`;
+	const diffLength = g_workObj.diffList.length;
+	const bayesFunc = (_offset, _length) => {
+		let result = 0;
+		for (let j = _offset; j < _length; j++) {
+			result += (_length - j) * (j + 1) * g_workObj.diffList[j];
+		}
+		return result;
+	};
+	const bayesExVal = 3 * bayesFunc(0, diffLength) / (diffLength * (diffLength + 1) * (diffLength + 2));
+	const result = Math.round((g_stateObj.adjustment - bayesExVal) * 10) / 10;
+	return getDiffFrame(result);
+}
+
 /*-----------------------------------------------------------*/
 /* Scene : RESULT [grape] */
 /*-----------------------------------------------------------*/
@@ -9716,7 +9815,6 @@ function resultInit() {
 	const getSign = _val => (_val > 0 ? `+` : ``);
 	const getDiffFrame = _val => `${getSign(_val)}${_val}${g_lblNameObj.frame}`;
 	const diffLength = g_workObj.diffList.length;
-	const diffLengthR = g_workObj.diffListR.length;
 	const bayesFunc = (_offset, _length) => {
 		let result = 0;
 		for (let j = _offset; j < _length; j++) {
@@ -9726,53 +9824,9 @@ function resultInit() {
 	};
 	const bayesExVal = 3 * bayesFunc(0, diffLength) / (diffLength * (diffLength + 1) * (diffLength + 2));
 	const estimatedAdj = (diffLength <= 20 ? `` : Math.round((g_stateObj.adjustment - bayesExVal) * 10) / 10);
-	
-	function AppErfA (_argument) {
-		return 2 / (1 + Math.exp(-3.4 * _argument)) - 1;
-	}
-	
-	function factorial (_number) {
-		if (_number < 2) {
-			return 1;
-		}
-		return _number * factorial(_number - 1);
-	}
-	function AppErfB (_argument) {
-		let result = 0;
-		for (let j = 0; j < 20; j++){
-			result += ((-1) ** j) * (_argument ** (2*j+1)) /  (factorial(j) * (2*j + 1));
-		}
-		return 2 * result / Math.sqrt(Math.PI);
-	}
-	function erf(_argument) {
-		if (Math.abs(_argument) <= 2.5) {
-			return AppErfB (_argument);
-		} else {
-			return AppErfA (_argument);
-		}
-	}
 
-	function TarwilCalc (_difFrame) {
-		const _difCnt = Math.abs(_difFrame);
-		if (_difCnt === 0) {
-			return 2;
-		} else if (_difCnt <= 5) {
-			return (2 * erf((65-39*_difCnt/3)/22.7));
-		} else if (_difCnt <= 8){
-			return (-11 * (39*_difCnt/3 - 65) /230);
-		} else if (_difCnt === 9){
-			return -2.5;
-		} else if (_difCnt === 10){
-			return -1.7;
-		}
-	}
-	
-	let TC_sum = 0;
-	for (let j = 0; j < diffLengthR; j++) {
-		TC_sum += 50 * TarwilCalc(g_workObj.diffListR[j]);
-	}
-	const TarwilPercent = Math.round(TC_sum / diffLengthR * 100) / 100;
-	
+	const TarwilPercent = calculateTRatio();
+	const KaraPercent = calculateKaRatio();
 
 	// 背景スプライトを作成
 	createMultipleSprite(`backResultSprite`, g_headerObj.backResultMaxDepth);
@@ -9933,13 +9987,15 @@ function resultInit() {
 		);
 		if (estimatedAdj !== ``) {
 			multiAppend(resultWindow,
-				makeCssResultSymbol(`lblAdj`, 350, g_cssObj.common_shakin, 4, g_lblNameObj.j_adj),
-				makeCssResultSymbol(`lblAdjS`, 260, g_cssObj.score, 5, `${getDiffFrame(estimatedAdj)}`, C_ALIGN_RIGHT),
+				makeCssResultSymbol(`lblAdj`, 420, g_cssObj.common_shakin, 4, g_lblNameObj.j_adj),
+				makeCssResultSymbol(`lblAdjS`, 330, g_cssObj.score, 5, `${getDiffFrame(estimatedAdj)}`, C_ALIGN_RIGHT),
 			);
 		}
 		multiAppend(resultWindow,
-			makeCssResultSymbol(`lblTCalc`, 350, g_cssObj.common_ii, 6, `T-Ratio`),
-			makeCssResultSymbol(`lblTCalcS`, 260, g_cssObj.score, 7, `${TarwilPercent}%`, C_ALIGN_RIGHT),		
+			makeCssResultSymbol(`lblTCalc`, 350, g_cssObj.common_ii, 4, `T-Ratio`),
+			makeCssResultSymbol(`lblTCalcS`, 260, g_cssObj.score, 5, `${TarwilPercent}%`, C_ALIGN_RIGHT),		
+			makeCssResultSymbol(`lblKCalc`, 350, g_cssObj.common_uwan, 6, `辛判定`),
+			makeCssResultSymbol(`lblKCalcS`, 260, g_cssObj.score, 7, `${KaraPercent}%`, C_ALIGN_RIGHT),	
 		);
 	}
 
