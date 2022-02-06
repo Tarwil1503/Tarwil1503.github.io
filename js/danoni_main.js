@@ -9681,7 +9681,7 @@ function finishViewing() {
 	
 function calculateTRatio () {
 	function AppErfA (_argument) {
-		return 2 / (1 + Math.exp(-3.4 * _argument)) - 1;
+		return 2 / (1 + Math.exp(-3.454 * _argument)) - 1;
 	}
 	
 	function factorial (_number) {
