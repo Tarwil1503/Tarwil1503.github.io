@@ -8282,7 +8282,7 @@ function MainInit() {
 	const jdgMainScoreObj = {
 		Ii: [`ii`, 0], Shakin: [`shakin`, 1], Matari: [`matari`, 2], Shobon: [`shobon`, 3], Uwan: [`uwan`, 4],
 		MCombo: [`combo`, 5], Kita: [`kita`, 7], Iknai: [`iknai`, 8], FCombo: [`combo`, 9],
-		TRText: [`ii`, 12], TRatio: [`combo`, 13], KCText: [`uwan`, 14], KaRatio: [`combo`, 15], EAdjText: [`shakin`, 17], EstAdj: [`combo`, 18],
+		TRText: [`ii`, 17], TRatio: [`combo`, 18], KCText: [`uwan`, 19], KaRatio: [`combo`, 20], EAdjText: [`shakin`, 21], EstAdj: [`combo`, 22],
 	};
 
 	Object.keys(jdgMainScoreObj).forEach(jdgScore => {
@@ -8928,7 +8928,7 @@ function MainInit() {
 		lblframe.textContent = currentFrame;
 		lblTRText.textContent = `T-Ratio`;
 		lblKCText.textContent = `辛判定`;
-		lblEAdjText.textContent = `推定Adj.`;
+		lblEAdjText.textContent = `推定Adj`;
 		// キーの押下状態を取得
 		for (let j = 0; j < keyNum; j++) {
 			for (let m = 0; m < g_workObj.keyCtrlN[j].length; m++) {
