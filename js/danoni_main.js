@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 /**
  * Dancing☆Onigiri (CW Edition)
  * 
@@ -7760,6 +7760,7 @@ function getArrowSettings() {
 	g_workObj.arrowRtn = copyArray2d(g_keyObj[`stepRtn${keyCtrlPtn}`]);
 	g_workObj.keyCtrl = copyArray2d(g_keyObj[`keyCtrl${keyCtrlPtn}`]);
 	g_workObj.diffList = [];
+	g_workObj.diffListR = [];
 
 	const keyCtrlLen = g_workObj.keyCtrl.length;
 	g_workObj.keyCtrlN = [...Array(keyCtrlLen)].map(_ => []);
@@ -8530,6 +8531,7 @@ function MainInit() {
 		// 矢印(枠外判定、AutoPlay: OFF)
 		arrowOFF: (_j, _arrowName, _cnt) => {
 			if (_cnt < (-1) * g_judgObj.arrowJ[g_judgPosObj.uwan]) {
+				g_workObj.diffListR.push(9);
 				judgeUwan(_cnt);
 				judgeObjDelete.arrow(_j, _arrowName);
 			}
@@ -8581,6 +8583,7 @@ function MainInit() {
 		// フリーズアロー(枠外判定)
 		frzNG: (_j, _k, _frzName, _cnt) => {
 			if (_cnt < (-1) * g_judgObj.frzJ[g_judgPosObj.iknai]) {
+				g_workObj.diffListR.push(9);
 				judgeIknai(_cnt);
 				g_attrObj[_frzName].judgEndFlg = true;
 
@@ -8598,6 +8601,7 @@ function MainInit() {
 		frzKeyUp: (_j, _k, _frzName, _cnt) => {
 			if (g_attrObj[_frzName].keyUpFrame > g_headerObj.frzAttempt) {
 				judgeIknai(_cnt);
+				g_workObj.diffListR.push(10);
 				g_attrObj[_frzName].judgEndFlg = true;
 				changeFailedFrz(_j, _k);
 			}
@@ -9370,6 +9374,7 @@ function judgeArrow(_j) {
 	const judgeTargetArrow = _difFrame => {
 		const _difCnt = Math.abs(_difFrame);
 		if (_difCnt <= g_judgObj.arrowJ[g_judgPosObj.uwan]) {
+			g_workObj.diffListR.push(_difCnt);
 			const [resultFunc, resultJdg] = checkJudgment(_difCnt);
 			resultFunc(_difFrame);
 			countFastSlow(_difFrame, g_headerObj.justFrames);
@@ -9390,6 +9395,9 @@ function judgeArrow(_j) {
 
 	const judgeTargetFrzArrow = _difFrame => {
 		const _difCnt = Math.abs(_difFrame);
+		if (_difCnt <= g_judgObj.frzJ[g_judgPosObj.iknai]) {
+			g_workObj.diffListR.push(_difCnt);
+		}
 		if (_difCnt <= g_judgObj.frzJ[g_judgPosObj.sfsf] && !g_attrObj[frzName].judgEndFlg) {
 			if (g_headerObj.frzStartjdgUse &&
 				(g_workObj.judgFrzHitCnt[_j] === undefined || g_workObj.judgFrzHitCnt[_j] <= fcurrentNo)) {
@@ -9708,6 +9716,7 @@ function resultInit() {
 	const getSign = _val => (_val > 0 ? `+` : ``);
 	const getDiffFrame = _val => `${getSign(_val)}${_val}${g_lblNameObj.frame}`;
 	const diffLength = g_workObj.diffList.length;
+	const diffLengthR = g_workObj.diffListR.length;
 	const bayesFunc = (_offset, _length) => {
 		let result = 0;
 		for (let j = _offset; j < _length; j++) {
@@ -9717,6 +9726,43 @@ function resultInit() {
 	};
 	const bayesExVal = 3 * bayesFunc(0, diffLength) / (diffLength * (diffLength + 1) * (diffLength + 2));
 	const estimatedAdj = (diffLength <= 20 ? `` : Math.round((g_stateObj.adjustment - bayesExVal) * 10) / 10);
+	
+	function GaussFunc (_argument) {
+		let result = 0;
+		const n = 10 ** 4; // infinityの代わりに大きな数を用いる
+		const dx = _argument / n;
+		for (let j = 0; j < n; j++){
+			const ExpVal = Math.exp(-((j * dx) ** 2));
+			result += ExpVal*dx;
+		}
+		return result;	
+	}
+	
+	function erf(_argument) {
+		return 2/Math.sqrt(Math.PI) * GaussFunc(_argument);
+	}
+	
+	function TarwilCalc (_difFrame) {
+		const _difCnt = Math.abs(_difFrame);
+		if (_difCnt === 0) {
+			return 2;
+		} else if (_difCnt <= 5) {
+			return (2 * erf((65-39*_difCnt/3)/22.7));
+		} else if (_difCnt <= 8){
+			return (-11 * (39*_difCnt/3 - 65) /230);
+		} else if (_difCnt === 9){
+			return -2.5;
+		} else if (_difCnt === 10){
+			return -1.7;
+		}
+	}
+	
+	let TC_sum = 0;
+	for (let j = 0; j < diffLengthR; j++) {
+		TC_sum += 50 * TarwilCalc(g_workObj.diffListR[j]);
+	}
+	const TarwilPercent = Math.round(TC_sum / diffLengthR * 100) / 100;
+	
 
 	// 背景スプライトを作成
 	createMultipleSprite(`backResultSprite`, g_headerObj.backResultMaxDepth);
@@ -9881,6 +9927,10 @@ function resultInit() {
 				makeCssResultSymbol(`lblAdjS`, 260, g_cssObj.score, 5, `${getDiffFrame(estimatedAdj)}`, C_ALIGN_RIGHT),
 			);
 		}
+		multiAppend(resultWindow,
+			makeCssResultSymbol(`lblTCalc`, 350, g_cssObj.common_ii, 6, `T-Ratio`),
+			makeCssResultSymbol(`lblTCalcS`, 260, g_cssObj.score, 7, `${TarwilPercent}%`, C_ALIGN_RIGHT),		
+		);
 	}
 
 	// ランク描画
