@@ -9727,21 +9727,31 @@ function resultInit() {
 	const bayesExVal = 3 * bayesFunc(0, diffLength) / (diffLength * (diffLength + 1) * (diffLength + 2));
 	const estimatedAdj = (diffLength <= 20 ? `` : Math.round((g_stateObj.adjustment - bayesExVal) * 10) / 10);
 	
-	function GaussFunc (_argument) {
-		let result = 0;
-		const n = 10 ** 4; // infinityの代わりに大きな数を用いる
-		const dx = _argument / n;
-		for (let j = 0; j < n; j++){
-			const ExpVal = Math.exp(-((j * dx) ** 2));
-			result += ExpVal*dx;
+	function AppErfA (_argument) {
+		return 2 / (1 + Math.exp(-3.4 * _argument)) - 1;
+	}
+	
+	function factorial (_number) {
+		if (_number < 2) {
+			return 1;
 		}
-		return result;	
+		return _number * factorial(_number - 1);
 	}
-	
+	function AppErfB (_argument) {
+		let result = 0;
+		for (let j = 0; j < 20; j++){
+			result += ((-1) ** j) * (_argument ** (2*j+1)) /  (factorial(j) * (2*j + 1));
+		}
+		return 2 * result / Math.sqrt(Math.PI);
+	}
 	function erf(_argument) {
-		return 2/Math.sqrt(Math.PI) * GaussFunc(_argument);
+		if (Math.abs(_argument) <= 2.5) {
+			return AppErfB (_argument);
+		} else {
+			return AppErfA (_argument);
+		}
 	}
-	
+
 	function TarwilCalc (_difFrame) {
 		const _difCnt = Math.abs(_difFrame);
 		if (_difCnt === 0) {
