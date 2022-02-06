@@ -9692,7 +9692,7 @@ function calculateTRatio () {
 	}
 	function AppErfB (_argument) {
 		let result = 0;
-		for (let j = 0; j < 20; j++){
+		for (let j = 0; j < 25; j++){
 			result += ((-1) ** j) * (_argument ** (2*j+1)) /  (factorial(j) * (2*j + 1));
 		}
 		return 2 * result / Math.sqrt(Math.PI);
@@ -9709,9 +9709,9 @@ function calculateTRatio () {
 		if (_difCnt === 0) {
 			return 2;
 		} else if (_difCnt <= 5) {
-			return (2 * erf((65-39*_difCnt/3)/22.7));
+			return (2 * erf((65-13*_difCnt)/22.7));
 		} else if (_difCnt <= 8){
-			return (-11 * (39*_difCnt/3 - 65) /230);
+			return (-143 * (_difCnt - 5) /230);
 		} else if (_difCnt === 9){
 			return -2.5;
 		} else if (_difCnt === 10){
