@@ -156,6 +156,8 @@ const g_workObj = {
 // 歌詞制御
 let g_wordSprite;
 
+let g_barNo;
+
 const g_wordObj = {
 	wordDir: 0,
 	wordDat: ``,
@@ -7913,6 +7915,7 @@ function MainInit() {
 	g_currentPage = `main`;
 
 	g_currentArrows = 0;
+	g_barNo = 0;
 	const wordMaxLen = g_scoreObj.wordMaxDepth + 1;
 	g_workObj.fadeInNo = [...Array(wordMaxLen)].fill(0);
 	g_workObj.fadeOutNo = [...Array(wordMaxLen)].fill(0);
@@ -8200,7 +8203,7 @@ function MainInit() {
 		}, g_cssObj.life_Border, g_cssObj.life_BorderColor),
 		
 		//誤差表示(棒)
-		createDivCss2Label(`lblHitError1`, g_lblNameObj.j_bar, {
+		createDivCss2Label(`lblHitError`, g_lblNameObj.j_bar, {
 			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN,
 		}),
 
@@ -8260,12 +8263,6 @@ function MainInit() {
 			opacity: g_stateObj.opacity / 100, display: g_workObj.judgmentDisp,
 		}, g_cssObj.common_ii);
 		charaJ.setAttribute(`cnt`, 0);
-		
-		const Errorbar = createDivCss2Label(`bar`, ``, {
-			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80,
-			w: 0, h: 20, siz: C_SIZ_MAIN,
-			opacity: g_stateObj.opacity / 100,				
-		}, g_cssObj.common_ii);
 
 		multiAppend(judgeSprite,
 
@@ -8287,7 +8284,7 @@ function MainInit() {
 			}, g_cssObj.common_combo),
 			
 			//判定の誤差表示
-			Errorbar,
+			//Errorbar,
 		);
 	});
 
@@ -8297,11 +8294,15 @@ function MainInit() {
 		MCombo: [`combo`, 5], Kita: [`kita`, 7], Iknai: [`iknai`, 8], FCombo: [`combo`, 9],
 		TRText: [`ii`, 17], TRatio: [`combo`, 18], KCText: [`uwan`, 19], KaRatio: [`combo`, 20], EAdjText: [`shakin`, 21], EstAdj: [`combo`, 22],
 	};
-
+	
 	Object.keys(jdgMainScoreObj).forEach(jdgScore => {
 		infoSprite.appendChild(makeCounterSymbol(`lbl${jdgScore}`, g_headerObj.playingWidth - 110,
 			g_cssObj[`common_${jdgMainScoreObj[jdgScore][0]}`], jdgMainScoreObj[jdgScore][1] + 1, 0, g_workObj.scoreDisp));
 	});
+	
+	lblTRText.textContent = `T-Ratio`;
+	lblKCText.textContent = `辛判定`;
+	lblEAdjText.textContent = `推定Adj`;
 
 	// パーフェクト演出
 	judgeSprite.appendChild(
@@ -8931,6 +8932,8 @@ function MainInit() {
 			}
 		}
 	}
+	
+	createDivErrorbar();
 
 	/**
 	 * フレーム処理(譜面台)
@@ -8939,9 +8942,8 @@ function MainInit() {
 
 		const currentFrame = g_scoreObj.frameNum;
 		lblframe.textContent = currentFrame;
-		lblTRText.textContent = `T-Ratio`;
-		lblKCText.textContent = `辛判定`;
-		lblEAdjText.textContent = `推定Adj`;
+		
+		
 		// キーの押下状態を取得
 		for (let j = 0; j < keyNum; j++) {
 			for (let m = 0; m < g_workObj.keyCtrlN[j].length; m++) {
@@ -9133,7 +9135,6 @@ function MainInit() {
 				document.querySelector(`#chara${jdg}`).setAttribute(`cnt`, --charaJCnt);
 				if (charaJCnt === 0) {
 					document.querySelector(`#chara${jdg}`).textContent = ``;
-					document.querySelector(`#bar`).textContent = ``;
 					document.querySelector(`#combo${jdg}`).textContent = ``;
 					document.querySelector(`#diff${jdg}`).textContent = ``;
 				}
@@ -9381,11 +9382,46 @@ const checkJudgment = (_difCnt) => {
 	return [jdgFuncList[idx], jdgList[idx]];
 };
 
+let fadeInError;
+//ErrorBarのDiv生成
+function createDivErrorbar () {
+	fadeInError = g_scoreObj.frameNum;
+	for (let j = 0; j < 100; j++) {
+		infoSprite.appendChild(createDivCss2Label(`bar_${j}`, g_lblNameObj.j_bar, {
+			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80,
+			w: 0, h: 20, siz: C_SIZ_MAIN,
+			animationDuration: `1.5s`,
+			animationName: `fadeOut0`,
+			animationDelay: ``,
+			opacity: 0,				
+			}, )
+		);
+	}
+}
+
+//ErrorBarの生成
+function createErrorbar (_difFrame) {
+	const _difCnt = Math.abs(_difFrame);
+	const jdgColor = checkJudgment(_difCnt)[1].toLowerCase();
+	let errorBar = document.getElementById(`bar_${g_barNo}`);
+	errorBar.removeAttribute(`class`)
+	errorBar.style.left = `${g_headerObj.playingWidth / 2 - 5 * _difFrame}px`;
+	errorBar.style.animationDelay = `${(g_scoreObj.frameNum - fadeInError) / g_fps}s`
+	errorBar.classList.add(g_cssObj.title_base, g_cssObj[`common_${jdgColor}`]);
+	if (g_barNo >= 70) {
+		g_barNo = 0;
+	} else {
+		g_barNo++;
+	}
+}
+
+
 /**
  * 矢印・フリーズアロー判定
  * @param {number} _j 対象矢印・フリーズアロー
  */
 function judgeArrow(_j) {
+	
 
 	const currentNo = g_workObj.judgArrowCnt[_j];
 	const arrowName = `arrow${_j}_${currentNo}`;
@@ -9399,7 +9435,7 @@ function judgeArrow(_j) {
 		const _difCnt = Math.abs(_difFrame);
 		if (_difCnt <= g_judgObj.arrowJ[g_judgPosObj.uwan]) {
 			g_workObj.diffListR.push(_difCnt);
-			document.querySelector(`#bar`).style.left = `${g_headerObj.playingWidth / 2 - 3 * _difFrame}px`;
+			createErrorbar(_difFrame);
 			lblTRatio.textContent = `${calculateTRatio()}%`;
 			lblKaRatio.textContent = `${calculateKaRatio()}%`;
 			const [resultFunc, resultJdg] = checkJudgment(_difCnt);
@@ -9432,7 +9468,7 @@ function judgeArrow(_j) {
 			}
 			if (g_attrObj[frzName].keyUpFrame === 0 && g_attrObj[frzName].isMoving) {
 				g_workObj.diffListR.push(_difCnt);
-				document.querySelector(`#bar`).style.left = `${g_headerObj.playingWidth / 2 - 3 * _difFrame}px`;
+				createErrorbar(_difFrame);
 				lblTRatio.textContent = `${calculateTRatio()}%`;
 				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 			}
@@ -9541,9 +9577,6 @@ function changeJudgeCharacter(_name, _character, _freezeFlg = ``) {
 	document.querySelector(`#chara${_freezeFlg}J`).innerHTML = `<span class="common_${_name}">${_character}</span>`;
 	document.querySelector(`#chara${_freezeFlg}J`).setAttribute(`cnt`, C_FRM_JDGMOTION);
 	document.querySelector(`#lbl${toCapitalize(_name)}`).textContent = g_resultObj[_name];
-	if (_freezeFlg === ``) {
-		document.querySelector(`#bar`).innerHTML = `<span class="common_${_name}">${g_lblNameObj.j_bar}</span>`;
-	}
 }
 
 /**
@@ -9699,7 +9732,7 @@ function finishViewing() {
 
 	
 function calculateTRatio () {
-	function AppErfA (_argument) {
+	/*function AppErfA (_argument) {
 		return 2 / (1 + Math.exp(-3.454 * _argument)) - 1;
 	}
 	
@@ -9711,7 +9744,7 @@ function calculateTRatio () {
 	}
 	function AppErfB (_argument) {
 		let result = 0;
-		for (let j = 0; j < 28; j++){
+		for (let j = 0; j < 20; j++){
 			result += ((-1) ** j) * (_argument ** (2*j+1)) /  (factorial(j) * (2*j + 1));
 		}
 		return 2 * result / Math.sqrt(Math.PI);
@@ -9722,25 +9755,27 @@ function calculateTRatio () {
 		} else {
 			return AppErfA (_argument);
 		}
-	}
+	}*/
 	function TarwilCalc (_difFrame) {
 		const _difCnt = Math.abs(_difFrame);
-		if (_difCnt === 0) {
-			return 2;
-		} else if (_difCnt <= 5) {
-			return (2 * erf((65-13*_difCnt)/22.7));
-		} else if (_difCnt <= 8){
-			return (-143 * (_difCnt - 5) /230);
-		} else if (_difCnt === 9){
-			return -2.5;
-		} else if (_difCnt === 10){
-			return -1.7;
+		switch (_difCnt) {
+			case 0: return 100;
+			case 1: return 99.8803059;
+			case 2: return 98.4888930;
+			case 3: return 89.4725630;
+			case 4: return 58.2003521;
+			case 5: return 0;
+			case 6: return -31.086957;
+			case 7: return -62.173913;
+			case 8: return -93.260870;
+			case 9: return -125;
+			case 10: return -85;
 		}
 	}
 	
 	let TC_sum = 0;
 	for (let j = 0; j < g_workObj.diffListR.length; j++) {
-	TC_sum += 50 * TarwilCalc(g_workObj.diffListR[j]);
+	TC_sum += TarwilCalc(g_workObj.diffListR[j]);
 	}
 	const result = Math.round(TC_sum / g_workObj.diffListR.length * 100) / 100;
 	return result;
