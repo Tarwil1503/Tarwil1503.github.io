@@ -9415,7 +9415,7 @@ function judgeArrow(_j) {
 				countFastSlow(_difFrame, g_headerObj.justFrames);
 				g_workObj.judgFrzHitCnt[_j] = fcurrentNo + 1;
 			}
-			if (g_attrObj[frzName].keyUpFrame === 0) {
+			if (g_attrObj[frzName].keyUpFrame === 0 && g_attrObj[frzName].isMoving) {
 				g_workObj.diffListR.push(_difCnt);
 				lblTRatio.textContent = `${calculateTRatio()}%`;
 				lblKaRatio.textContent = `${calculateKaRatio()}%`;
