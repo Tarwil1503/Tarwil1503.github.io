@@ -8198,6 +8198,11 @@ function MainInit() {
 			w: 35, h: 16, background: C_CLR_BORDER, styleName: `lifeBorder`,
 			fontFamily: getBasicFont(), display: g_workObj.lifegaugeDisp,
 		}, g_cssObj.life_Border, g_cssObj.life_BorderColor),
+		
+		//誤差表示(棒)
+		createDivCss2Label(`lblHitError1`, g_lblNameObj.j_bar, {
+			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN,
+		}),
 
 		// 曲名・アーティスト名表示
 		createDivCss2Label(`lblCredit`, creditName, {
@@ -8255,6 +8260,12 @@ function MainInit() {
 			opacity: g_stateObj.opacity / 100, display: g_workObj.judgmentDisp,
 		}, g_cssObj.common_ii);
 		charaJ.setAttribute(`cnt`, 0);
+		
+		const Errorbar = createDivCss2Label(`bar`, ``, {
+			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80,
+			w: 0, h: 20, siz: C_SIZ_MAIN,
+			opacity: g_stateObj.opacity / 100,				
+		}, g_cssObj.common_ii);
 
 		multiAppend(judgeSprite,
 
@@ -8274,7 +8285,9 @@ function MainInit() {
 				w: C_LEN_JDGCHARA_WIDTH, h: C_LEN_JDGCHARA_HEIGHT, siz: C_SIZ_MAIN,
 				opacity: g_stateObj.opacity / 100, display: g_workObj.fastslowDisp,
 			}, g_cssObj.common_combo),
-
+			
+			//判定の誤差表示
+			Errorbar,
 		);
 	});
 
@@ -9120,6 +9133,7 @@ function MainInit() {
 				document.querySelector(`#chara${jdg}`).setAttribute(`cnt`, --charaJCnt);
 				if (charaJCnt === 0) {
 					document.querySelector(`#chara${jdg}`).textContent = ``;
+					document.querySelector(`#bar`).textContent = ``;
 					document.querySelector(`#combo${jdg}`).textContent = ``;
 					document.querySelector(`#diff${jdg}`).textContent = ``;
 				}
@@ -9385,6 +9399,7 @@ function judgeArrow(_j) {
 		const _difCnt = Math.abs(_difFrame);
 		if (_difCnt <= g_judgObj.arrowJ[g_judgPosObj.uwan]) {
 			g_workObj.diffListR.push(_difCnt);
+			document.querySelector(`#bar`).style.left = `${g_headerObj.playingWidth / 2 - 3 * _difFrame}px`;
 			lblTRatio.textContent = `${calculateTRatio()}%`;
 			lblKaRatio.textContent = `${calculateKaRatio()}%`;
 			const [resultFunc, resultJdg] = checkJudgment(_difCnt);
@@ -9417,6 +9432,7 @@ function judgeArrow(_j) {
 			}
 			if (g_attrObj[frzName].keyUpFrame === 0 && g_attrObj[frzName].isMoving) {
 				g_workObj.diffListR.push(_difCnt);
+				document.querySelector(`#bar`).style.left = `${g_headerObj.playingWidth / 2 - 3 * _difFrame}px`;
 				lblTRatio.textContent = `${calculateTRatio()}%`;
 				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 			}
@@ -9525,6 +9541,9 @@ function changeJudgeCharacter(_name, _character, _freezeFlg = ``) {
 	document.querySelector(`#chara${_freezeFlg}J`).innerHTML = `<span class="common_${_name}">${_character}</span>`;
 	document.querySelector(`#chara${_freezeFlg}J`).setAttribute(`cnt`, C_FRM_JDGMOTION);
 	document.querySelector(`#lbl${toCapitalize(_name)}`).textContent = g_resultObj[_name];
+	if (_freezeFlg === ``) {
+		document.querySelector(`#bar`).innerHTML = `<span class="common_${_name}">${g_lblNameObj.j_bar}</span>`;
+	}
 }
 
 /**
@@ -9692,7 +9711,7 @@ function calculateTRatio () {
 	}
 	function AppErfB (_argument) {
 		let result = 0;
-		for (let j = 0; j < 25; j++){
+		for (let j = 0; j < 28; j++){
 			result += ((-1) ** j) * (_argument ** (2*j+1)) /  (factorial(j) * (2*j + 1));
 		}
 		return 2 * result / Math.sqrt(Math.PI);
