@@ -8548,6 +8548,7 @@ function MainInit() {
 		arrowOFF: (_j, _arrowName, _cnt) => {
 			if (_cnt < (-1) * g_judgObj.arrowJ[g_judgPosObj.uwan]) {
 				g_workObj.diffListR.push(9);
+				createErrorbar(-10);
 				lblTRatio.textContent = `${calculateTRatio()}%`;
 				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 				judgeUwan(_cnt);
@@ -8602,6 +8603,7 @@ function MainInit() {
 		frzNG: (_j, _k, _frzName, _cnt) => {
 			if (_cnt < (-1) * g_judgObj.frzJ[g_judgPosObj.iknai]) {
 				g_workObj.diffListR.push(9);
+				createErrorbar(-10);
 				lblTRatio.textContent = `${calculateTRatio()}%`;
 				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 				judgeIknai(_cnt);
@@ -9402,7 +9404,12 @@ function createDivErrorbar () {
 //ErrorBarの生成
 function createErrorbar (_difFrame) {
 	const _difCnt = Math.abs(_difFrame);
-	const jdgColor = checkJudgment(_difCnt)[1].toLowerCase();
+	let jdgColor;
+	if (_difCnt <= 8) {
+		jdgColor = checkJudgment(_difCnt)[1].toLowerCase();
+	} else {
+		jdgColor = `uwan`;
+	}
 	let errorBar = document.getElementById(`bar_${g_barNo}`);
 	errorBar.removeAttribute(`class`)
 	errorBar.style.left = `${g_headerObj.playingWidth / 2 - 5 * _difFrame}px`;
