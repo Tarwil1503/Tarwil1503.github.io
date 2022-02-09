@@ -8555,7 +8555,7 @@ function MainInit() {
 			if (_cnt < (-1) * g_judgObj.arrowJ[g_judgPosObj.uwan]) {
 				g_workObj.diffListR.push(9);
 				createErrorbar(-10);
-				lblTRatio.textContent = `${calculateTRatio()}%`;
+				lblTRatio.textContent = calculateTRatio();
 				judgeUwan(_cnt);
 				judgeObjDelete.arrow(_j, _arrowName);
 			}
@@ -8609,7 +8609,7 @@ function MainInit() {
 			if (_cnt < (-1) * g_judgObj.frzJ[g_judgPosObj.iknai]) {
 				g_workObj.diffListR.push(9);
 				createErrorbar(-10);
-				lblTRatio.textContent = `${calculateTRatio()}%`;
+				lblTRatio.textContent = calculateTRatio();
 				judgeIknai(_cnt);
 				g_attrObj[_frzName].judgEndFlg = true;
 
@@ -8628,7 +8628,7 @@ function MainInit() {
 			if (g_attrObj[_frzName].keyUpFrame > g_headerObj.frzAttempt) {
 				judgeIknai(_cnt);
 				g_workObj.diffListR.push(10);
-				lblTRatio.textContent = `${calculateTRatio()}%`;
+				lblTRatio.textContent = calculateTRatio();
 				g_attrObj[_frzName].judgEndFlg = true;
 				changeFailedFrz(_j, _k);
 			}
@@ -9446,7 +9446,7 @@ function judgeArrow(_j) {
 		if (_difCnt <= g_judgObj.arrowJ[g_judgPosObj.uwan]) {
 			g_workObj.diffListR.push(_difCnt);
 			createErrorbar(_difFrame);
-			lblTRatio.textContent = `${calculateTRatio()}%`;
+			lblTRatio.textContent = calculateTRatio();
 			const [resultFunc, resultJdg] = checkJudgment(_difCnt);
 			resultFunc(_difFrame);
 			countFastSlow(_difFrame, g_headerObj.justFrames);
@@ -9478,7 +9478,7 @@ function judgeArrow(_j) {
 			if (g_attrObj[frzName].keyUpFrame === 0 && g_attrObj[frzName].isMoving) {
 				g_workObj.diffListR.push(_difCnt);
 				createErrorbar(_difFrame);
-				lblTRatio.textContent = `${calculateTRatio()}%`;
+				lblTRatio.textContent = calculateTRatio();
 			}
 			changeHitFrz(_j, fcurrentNo, `frz`);
 			return true;
@@ -9786,8 +9786,10 @@ function calculateTRatio () {
 	for (let j = 0; j < g_workObj.diffListR.length; j++) {
 	TC_sum += TarwilCalc(g_workObj.diffListR[j]);
 	}
-	const result = Math.round(TC_sum / g_workObj.diffListR.length * 100) / 100;
-	return result;
+	
+	const resultInt = Math.floor(TC_sum / g_workObj.diffListR.length);
+	const resultDecimal = `${Math.round((TC_sum / g_workObj.diffListR.length - resultInt) * 100)}`.padEnd(2, `0`);
+	return `${resultInt}.${resultDecimal}%`;
 }
 
 function calculateKaRatio () {
@@ -9805,8 +9807,9 @@ function calculateKaRatio () {
 	for (let j = 0; j < g_workObj.diffListR.length; j++) {
 		KC_sum += KaCalc(g_workObj.diffListR[j]);
 	}
-	const result = Math.round(KC_sum / g_workObj.diffListR.length * 100) / 100;
-	return result;
+	const resultInt = Math.floor(KC_sum / g_workObj.diffListR.length);
+	const resultDecimal = `${Math.round((KC_sum / g_workObj.diffListR.length - resultInt) * 100)}`.padEnd(2, `0`);
+	return `${resultInt}.${resultDecimal}%`;
 }
 
 function calculateEstAdj () {
@@ -10054,9 +10057,9 @@ function resultInit() {
 		}
 		multiAppend(resultWindow,
 			makeCssResultSymbol(`lblTCalc`, 350, g_cssObj.common_ii, 4, `T-Ratio`),
-			makeCssResultSymbol(`lblTCalcS`, 260, g_cssObj.score, 5, `${TarwilPercent}%`, C_ALIGN_RIGHT),		
+			makeCssResultSymbol(`lblTCalcS`, 260, g_cssObj.score, 5, TarwilPercent, C_ALIGN_RIGHT),		
 			makeCssResultSymbol(`lblKCalc`, 350, g_cssObj.common_uwan, 6, `辛判定`),
-			makeCssResultSymbol(`lblKCalcS`, 260, g_cssObj.score, 7, `${KaraPercent}%`, C_ALIGN_RIGHT),	
+			makeCssResultSymbol(`lblKCalcS`, 260, g_cssObj.score, 7, KaraPercent, C_ALIGN_RIGHT),	
 		);
 	}
 
