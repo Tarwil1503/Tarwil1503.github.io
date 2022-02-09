@@ -157,6 +157,7 @@ const g_workObj = {
 let g_wordSprite;
 
 let g_barNo;
+let g_deleteNo;
 
 const g_wordObj = {
 	wordDir: 0,
@@ -7916,6 +7917,7 @@ function MainInit() {
 
 	g_currentArrows = 0;
 	g_barNo = 0;
+	g_deleteNo = 0;
 	const wordMaxLen = g_scoreObj.wordMaxDepth + 1;
 	g_workObj.fadeInNo = [...Array(wordMaxLen)].fill(0);
 	g_workObj.fadeOutNo = [...Array(wordMaxLen)].fill(0);
@@ -8204,8 +8206,18 @@ function MainInit() {
 		
 		//誤差表示(棒)
 		createDivCss2Label(`lblHitError`, g_lblNameObj.j_bar, {
-			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN,
+			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: 0.6, display: g_workObj.specialDisp,
 		}),
+		
+		//推定Adj表示(棒)　※色はuwanとして出力される
+		createDivCss2Label(`lblEstAdj`, g_lblNameObj.j_bar, {
+			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: 0.85, display: g_workObj.specialDisp,
+		}, g_cssObj.common_uwan),
+		
+		//T-Ratio表示 ※色はiiとして表示される
+		createDivCss2Label(`lblTRatio`, `00.00%`, {
+			x: g_headerObj.playingWidth / 2 + 5 * 8, y: (g_sHeight + g_posObj.stepYR) / 2 - 98, w: 0, h: 20, siz: C_SIZ_MAIN, display: g_workObj.specialDisp,
+		}, g_cssObj.common_ii),
 
 		// 曲名・アーティスト名表示
 		createDivCss2Label(`lblCredit`, creditName, {
@@ -8283,8 +8295,6 @@ function MainInit() {
 				opacity: g_stateObj.opacity / 100, display: g_workObj.fastslowDisp,
 			}, g_cssObj.common_combo),
 			
-			//判定の誤差表示
-			//Errorbar,
 		);
 	});
 
@@ -8292,7 +8302,6 @@ function MainInit() {
 	const jdgMainScoreObj = {
 		Ii: [`ii`, 0], Shakin: [`shakin`, 1], Matari: [`matari`, 2], Shobon: [`shobon`, 3], Uwan: [`uwan`, 4],
 		MCombo: [`combo`, 5], Kita: [`kita`, 7], Iknai: [`iknai`, 8], FCombo: [`combo`, 9],
-		TRText: [`ii`, 17], TRatio: [`combo`, 18], KCText: [`uwan`, 19], KaRatio: [`combo`, 20], EAdjText: [`shakin`, 21], EstAdj: [`combo`, 22],
 	};
 	
 	Object.keys(jdgMainScoreObj).forEach(jdgScore => {
@@ -8300,9 +8309,6 @@ function MainInit() {
 			g_cssObj[`common_${jdgMainScoreObj[jdgScore][0]}`], jdgMainScoreObj[jdgScore][1] + 1, 0, g_workObj.scoreDisp));
 	});
 	
-	lblTRText.textContent = `T-Ratio`;
-	lblKCText.textContent = `辛判定`;
-	lblEAdjText.textContent = `推定Adj`;
 
 	// パーフェクト演出
 	judgeSprite.appendChild(
@@ -8550,7 +8556,6 @@ function MainInit() {
 				g_workObj.diffListR.push(9);
 				createErrorbar(-10);
 				lblTRatio.textContent = `${calculateTRatio()}%`;
-				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 				judgeUwan(_cnt);
 				judgeObjDelete.arrow(_j, _arrowName);
 			}
@@ -8605,7 +8610,6 @@ function MainInit() {
 				g_workObj.diffListR.push(9);
 				createErrorbar(-10);
 				lblTRatio.textContent = `${calculateTRatio()}%`;
-				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 				judgeIknai(_cnt);
 				g_attrObj[_frzName].judgEndFlg = true;
 
@@ -8625,7 +8629,6 @@ function MainInit() {
 				judgeIknai(_cnt);
 				g_workObj.diffListR.push(10);
 				lblTRatio.textContent = `${calculateTRatio()}%`;
-				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 				g_attrObj[_frzName].judgEndFlg = true;
 				changeFailedFrz(_j, _k);
 			}
@@ -8935,7 +8938,7 @@ function MainInit() {
 		}
 	}
 	
-	createDivErrorbar();
+	//createDivErrorbar();
 
 	/**
 	 * フレーム処理(譜面台)
@@ -8944,6 +8947,8 @@ function MainInit() {
 
 		const currentFrame = g_scoreObj.frameNum;
 		lblframe.textContent = currentFrame;
+		
+		deleteErrorbar();
 		
 		
 		// キーの押下状態を取得
@@ -9384,41 +9389,39 @@ const checkJudgment = (_difCnt) => {
 	return [jdgFuncList[idx], jdgList[idx]];
 };
 
-let fadeInError;
-//ErrorBarのDiv生成
-function createDivErrorbar () {
-	fadeInError = g_scoreObj.frameNum;
-	for (let j = 0; j < 100; j++) {
-		infoSprite.appendChild(createDivCss2Label(`bar_${j}`, g_lblNameObj.j_bar, {
-			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80,
-			w: 0, h: 20, siz: C_SIZ_MAIN,
-			animationDuration: `1.5s`,
-			animationName: `fadeOut0`,
-			animationDelay: ``,
-			opacity: 0,				
-			}, )
+
+const checkErrorbar = [];
+//ErrorBarの生成
+function createErrorbar (_difFrame) {
+	if (g_stateObj.d_special !== C_FLG_OFF) {
+		const _difCnt = Math.abs(_difFrame);
+		let jdgColor;
+		if (_difCnt <= 8) {
+			jdgColor = checkJudgment(_difCnt)[1].toLowerCase();
+		} else {
+			jdgColor = `uwan`;
+		}
+		infoSprite.appendChild(createDivCss2Label(`bar_${g_barNo}`, g_lblNameObj.j_bar, {
+			x: g_headerObj.playingWidth / 2 - 5 * _difFrame, y: (g_sHeight + g_posObj.stepYR) / 2 - 80,
+				w: 0, h: 20, siz: C_SIZ_MAIN,
+				animationDuration: `1.5s`,
+				animationName: `fadeOut0`,
+				opacity: 0,
+			}, g_cssObj[`common_${jdgColor}`])
 		);
+		checkErrorbar[g_barNo] = g_scoreObj.frameNum;
+		g_barNo++;
 	}
 }
 
-//ErrorBarの生成
-function createErrorbar (_difFrame) {
-	const _difCnt = Math.abs(_difFrame);
-	let jdgColor;
-	if (_difCnt <= 8) {
-		jdgColor = checkJudgment(_difCnt)[1].toLowerCase();
-	} else {
-		jdgColor = `uwan`;
-	}
-	let errorBar = document.getElementById(`bar_${g_barNo}`);
-	errorBar.removeAttribute(`class`)
-	errorBar.style.left = `${g_headerObj.playingWidth / 2 - 5 * _difFrame}px`;
-	errorBar.style.animationDelay = `${(g_scoreObj.frameNum - fadeInError) / g_fps}s`
-	errorBar.classList.add(g_cssObj.title_base, g_cssObj[`common_${jdgColor}`]);
-	if (g_barNo >= 70) {
-		g_barNo = 0;
-	} else {
-		g_barNo++;
+//ErrorBarの削除
+function deleteErrorbar () {
+	if (document.getElementById(`bar_${g_deleteNo}`) !== null) {
+		if ((g_scoreObj.frameNum - checkErrorbar[g_deleteNo]) / g_fps >= 1.5) {
+			let tempError = document.getElementById(`bar_${g_deleteNo}`);
+			tempError.parentNode.removeChild(tempError);
+			g_deleteNo++;
+		}
 	}
 }
 
@@ -9444,7 +9447,6 @@ function judgeArrow(_j) {
 			g_workObj.diffListR.push(_difCnt);
 			createErrorbar(_difFrame);
 			lblTRatio.textContent = `${calculateTRatio()}%`;
-			lblKaRatio.textContent = `${calculateKaRatio()}%`;
 			const [resultFunc, resultJdg] = checkJudgment(_difCnt);
 			resultFunc(_difFrame);
 			countFastSlow(_difFrame, g_headerObj.justFrames);
@@ -9477,7 +9479,6 @@ function judgeArrow(_j) {
 				g_workObj.diffListR.push(_difCnt);
 				createErrorbar(_difFrame);
 				lblTRatio.textContent = `${calculateTRatio()}%`;
-				lblKaRatio.textContent = `${calculateKaRatio()}%`;
 			}
 			changeHitFrz(_j, fcurrentNo, `frz`);
 			return true;
@@ -9506,7 +9507,8 @@ function judgeArrow(_j) {
 function displayDiff(_difFrame, _justFrames = 0) {
 	let diffJDisp = ``;
 	g_workObj.diffList.push(_difFrame);
-	lblEstAdj.textContent = `${calculateEstAdj()}`;
+	lblEstAdj.style.left = `${g_headerObj.playingWidth / 2 - 5 * calculateEstAdj()}px`;
+	lblEstAdj.style.zIndex = 100;
 	const difCnt = Math.abs(_difFrame);
 	if (_difFrame > _justFrames) {
 		diffJDisp = `<span class="common_matari">Fast ${difCnt} Frames</span>`;
@@ -9808,8 +9810,6 @@ function calculateKaRatio () {
 }
 
 function calculateEstAdj () {
-	const getSign = _val => (_val > 0 ? `+` : ``);
-	const getDiffFrame = _val => `${getSign(_val)}${_val}${g_lblNameObj.frame}`;
 	const diffLength = g_workObj.diffList.length;
 	const bayesFunc = (_offset, _length) => {
 		let result = 0;
@@ -9818,9 +9818,9 @@ function calculateEstAdj () {
 		}
 		return result;
 	};
-	const bayesExVal = 3 * bayesFunc(0, diffLength) / (diffLength * (diffLength + 1) * (diffLength + 2));
-	const result = Math.round((g_stateObj.adjustment - bayesExVal) * 10) / 10;
-	return getDiffFrame(result);
+	const bayesExVal = 6 * bayesFunc(0, diffLength) / (diffLength * (diffLength + 1) * (diffLength + 2));
+	const result = bayesExVal;
+	return result;
 }
 
 /*-----------------------------------------------------------*/
@@ -9883,7 +9883,7 @@ function resultInit() {
 		}
 		return result;
 	};
-	const bayesExVal = 3 * bayesFunc(0, diffLength) / (diffLength * (diffLength + 1) * (diffLength + 2));
+	const bayesExVal = 6 * bayesFunc(0, diffLength) / (diffLength * (diffLength + 1) * (diffLength + 2));
 	const estimatedAdj = (diffLength <= 20 ? `` : Math.round((g_stateObj.adjustment - bayesExVal) * 10) / 10);
 
 	const TarwilPercent = calculateTRatio();
