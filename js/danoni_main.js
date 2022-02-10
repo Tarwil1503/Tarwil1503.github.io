@@ -9789,7 +9789,8 @@ function calculateTRatio () {
 	
 	const resultInt = Math.floor(TC_sum / g_workObj.diffListR.length);
 	const resultDecimal = Math.round((TC_sum / g_workObj.diffListR.length - resultInt) * 100) / 100;
-	return `${resultInt + resultDecimal}%`;
+	const result = Math.floor( (resultInt + resultDecimal) * 100) / 100;
+	return `${result}%`;
 }
 
 function calculateKaRatio () {
@@ -9808,8 +9809,9 @@ function calculateKaRatio () {
 		KC_sum += KaCalc(g_workObj.diffListR[j]);
 	}
 	const resultInt = Math.floor(KC_sum / g_workObj.diffListR.length);
-	const resultDecimal = Math.floor((KC_sum / g_workObj.diffListR.length - resultInt) * 100) / 100;
-	return `${resultInt + resultDecimal}%`;
+	const resultDecimal = Math.round((KC_sum / g_workObj.diffListR.length - resultInt) * 100) / 100;
+	const result = Math.floor( (resultInt + resultDecimal) * 100) / 100;
+	return `${result}%`;
 }
 
 function calculateEstAdj () {
