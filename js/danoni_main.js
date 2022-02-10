@@ -9807,8 +9807,8 @@ function calculateKaRatio () {
 	for (let j = 0; j < g_workObj.diffListR.length; j++) {
 		KC_sum += KaCalc(g_workObj.diffListR[j]);
 	}
-	const resultInt = Math.floor(TC_sum / g_workObj.diffListR.length);
-	const resultDecimal = Math.round((TC_sum / g_workObj.diffListR.length - resultInt) * 100) / 100;
+	const resultInt = Math.floor(KC_sum / g_workObj.diffListR.length);
+	const resultDecimal = Math.floor((KC_sum / g_workObj.diffListR.length - resultInt) * 100) / 100;
 	return `${resultInt + resultDecimal}%`;
 }
 
