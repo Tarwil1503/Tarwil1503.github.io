@@ -422,6 +422,8 @@ const g_stateObj = {
     appearance: `Visible`,
     filterLock: C_FLG_OFF,
     opacity: 100,
+	errorbar: C_FLG_OFF,
+	ratioType: C_FLG_OFF,
 
     rotateEnabled: true,
     flatStepHeight: C_ARW_WIDTH,
@@ -504,6 +506,12 @@ const g_settings = {
     filterLockNum: 0,
 
     opacitys: [10, 25, 50, 75, 100],
+	
+	errorbars: [C_FLG_OFF, `Type1`, `Type2`],
+	errorbarNum: 0,
+	
+	ratioTypes: [C_FLG_OFF, `W-Ratio`, `K-Ratio`],
+	ratioTypeNum: 0,
 
     scoreDetails: [`Speed`, `Density`, `ToolDif`],
     scoreDetailNum: 0,
@@ -558,7 +566,7 @@ const g_keycons = {
 let g_displays = [`stepZone`, `judgment`, `fastSlow`, `lifeGauge`, `score`, `musicInfo`, `filterLine`,
     `speed`, `color`, `lyrics`, `background`, `arrowEffect`, `special`];
 
-let g_storeSettings = [`appearance`, `opacity`, `d_stepzone`, `d_judgment`, `d_fastslow`, `d_lifegauge`,
+let g_storeSettings = [`appearance`, `opacity`, `errorbar`, `ratioType`, `d_stepzone`, `d_judgment`, `d_fastslow`, `d_lifegauge`,
     `d_score`, `d_musicinfo`, `d_filterline`];
 
 let g_canDisabledSettings = [`motion`, `scroll`, `shuffle`, `autoPlay`, `gauge`, `appearance`];
@@ -951,6 +959,10 @@ const g_shortcutObj = {
         KeyA: { id: `lnkAppearanceR` },
         ShiftLeft_KeyO: { id: `lnkOpacityL` },
         KeyO: { id: `lnkOpacityR` },
+		ShiftLeft_KeyE: { id: `lnkErrorbarL` },
+		KeyE: { id: `lnkErrorbarR` },
+		ShiftLeft_KeyR: { id: `lnkRatioTypeL` },
+		KeyR: { id: `lnkRatioTypeR` },
 
         Digit1: { id: `lnkstepZone` },
         Digit2: { id: `lnkjudgment` },
@@ -2622,6 +2634,8 @@ const g_lblNameObj = {
 
     Appearance: `Appearance`,
     Opacity: `Opacity`,
+	Errorbar: `Errorbar`,
+	RatioType: `RatioType`,
 
     'u_x': `x`,
     'u_%': `%`,
@@ -2847,6 +2861,8 @@ const g_lang_msgObj = {
 
         appearance: `流れる矢印の見え方を制御します。`,
         opacity: `判定キャラクタ、コンボ数、Fast/Slow、Hidden+/Sudden+の\n境界線表示の透明度を設定します。`,
+		errorbar: `誤差判定の表示方式を変更します。より具体的に、\nType1は矢印ごとに1.5秒の間誤差判定を表示し、\nType2は1つの誤差棒で直前の判定のみ表示します。`,
+		ratioType: `表示する精度を変更します。`,
 
         configType: `キーコンフィグ対象を切り替えます。\n[Main] メインキーのみ, [Replaced] 代替キーのみ, [ALL] 全て`,
         colorType: `矢印色の配色パターンを変更します。\nType1～4選択時は色変化が自動でOFFになります。\n[Type0] グラデーション切替, [Type1～4] デフォルトパターン`,
@@ -2897,6 +2913,8 @@ const g_lang_msgObj = {
 
         appearance: `Controls how the flowing sequences look.`,
         opacity: `Set the transparency of some objects such as judgment, combo counts, fast and slow`,
+		errorbar: `Changes how the errorbars are displayed. \nType1 displays every single judgment for 1.5s. \nType2 displays the judgment of the arrow just before.`,
+		ratioType: `Changes the shown ratio.`,
 
         configType: `Switch the key config target.\n[Main] main keys only, [Replaced] alternate keys only, [ALL] all keys`,
         colorType: `Change the color scheme of the sequences color.\nWhen Type 1 to 4 are selected, the color change is automatically turned off.\n[Type0] Switch the sequences color gradations, [Type1～4] default color scheme`,
