@@ -1340,6 +1340,7 @@ function loadLocalStorage() {
 		checkLocalParam(`volume`, C_TYP_NUMBER, g_settings.volumes.length - 1);
 		checkLocalParam(`appearance`);
 		checkLocalParam(`opacity`, C_TYP_NUMBER, g_settings.opacitys.length - 1);
+		checkLocalParam(`errorbar`);
 
 		// ハイスコア取得準備
 		if (g_localStorage.highscores === undefined) {
@@ -5455,8 +5456,10 @@ function createSettingsDisplayWindow(_sprite) {
 
 	// 設定名、縦位置、縦位置差分、幅差分、高さ差分
 	const settingList = [
-		[`appearance`, 7.4, 10, 0, 0],
-		[`opacity`, 9, 10, 0, 0],
+		[`appearance`, 7.4 + 0.4, 10, 0, 0],
+		[`opacity`, 9 + 0.4, 10, 0, 0],
+		[`errorbar`, 10 + 0.4, 10, 0, 0],
+		[`ratioType`, 11 + 0.4, 10, 0, 0]
 	];
 
 	// 設定毎に個別のスプライトを作成し、その中にラベル・ボタン類を配置
@@ -5519,8 +5522,18 @@ function createSettingsDisplayWindow(_sprite) {
 	// ---------------------------------------------------
 	// 判定表示系の不透明度 (Opacity)
 	// 縦位置: 9
-	createGeneralSetting(spriteList.opacity, `opacity`, { unitName: g_lblNameObj.percent, displayName: g_currentPage });
+	createGeneralSetting(spriteList.opacity, `opacity`, { unitName: g_lblNameObj.percent, displayName: g_currentPage, });
+	
+	// ---------------------------------------------------
+	// 誤差判定のタイプ (Errorbar)
+	// 縦位置: 10
+	createGeneralSetting(spriteList.errorbar, `errorbar`, { displayName: g_currentPage, });
 
+	// ---------------------------------------------------
+	// 精度のタイプ (RatioType)
+	// 縦位置: 11
+	createGeneralSetting(spriteList.ratioType, `ratioType`, { displayName: g_currentPage, });
+	
 	/**
 	 * Display表示/非表示ボタン
 	 * @param {*} _name 
@@ -8206,18 +8219,18 @@ function MainInit() {
 		
 		//誤差表示(棒)
 		createDivCss2Label(`lblHitError`, g_lblNameObj.j_bar, {
-			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: 0.6, display: g_workObj.specialDisp,
+			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: (g_stateObj.autoAll !== C_FLG_OFF) ? 0 : 0.6,
 		}),
 		
 		//推定Adj表示(棒)　※色はuwanとして出力される
 		createDivCss2Label(`lblEstAdj`, g_lblNameObj.j_bar, {
-			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: 0.85, display: g_workObj.specialDisp,
+			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: (g_stateObj.autoAll !== C_FLG_OFF) ? 0 : 0.85,
 		}, g_cssObj.common_uwan),
 		
 		//T-Ratio表示 ※色はiiとして表示される
-		createDivCss2Label(`lblTRatio`, `00.00%`, {
-			x: g_headerObj.playingWidth / 2 + 5 * 8, y: (g_sHeight + g_posObj.stepYR) / 2 - 98, w: 0, h: 20, siz: C_SIZ_MAIN, display: g_workObj.specialDisp,
-		}, g_cssObj.common_ii),
+		createDivCss2Label(`lblRatio`, `00.00%`, {
+			x: g_headerObj.playingWidth / 2 + 5 * 8, y: (g_sHeight + g_posObj.stepYR) / 2 - 98, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: ( g_stateObj.autoAll !== C_FLG_OFF || g_stateObj.ratioType === C_FLG_OFF) ? 0 : 1,
+		}, (g_stateObj.ratioType === `W-Ratio`) ? g_cssObj.common_ii : g_cssObj.common_uwan),
 
 		// 曲名・アーティスト名表示
 		createDivCss2Label(`lblCredit`, creditName, {
@@ -8239,7 +8252,8 @@ function MainInit() {
 			x: 68, y: g_sHeight - 30, w: 60, h: 20, siz: C_SIZ_MAIN, display: g_workObj.musicinfoDisp,
 		}),
 	);
-
+	
+	
 	// ボーダーライン表示
 	lifeBorderObj.textContent = g_workObj.lifeBorder;
 	if (g_stateObj.lifeBorder === 0 || g_workObj.lifeVal === g_headerObj.maxLifeVal) {
@@ -8555,7 +8569,7 @@ function MainInit() {
 			if (_cnt < (-1) * g_judgObj.arrowJ[g_judgPosObj.uwan]) {
 				g_workObj.diffListR.push(9);
 				createErrorbar(-10);
-				lblTRatio.textContent = calculateTRatio();
+				lblRatio.textContent = calculateRatio();
 				judgeUwan(_cnt);
 				judgeObjDelete.arrow(_j, _arrowName);
 			}
@@ -8609,7 +8623,7 @@ function MainInit() {
 			if (_cnt < (-1) * g_judgObj.frzJ[g_judgPosObj.iknai]) {
 				g_workObj.diffListR.push(9);
 				createErrorbar(-10);
-				lblTRatio.textContent = calculateTRatio();
+				lblRatio.textContent = calculateRatio();
 				judgeIknai(_cnt);
 				g_attrObj[_frzName].judgEndFlg = true;
 
@@ -8628,7 +8642,7 @@ function MainInit() {
 			if (g_attrObj[_frzName].keyUpFrame > g_headerObj.frzAttempt) {
 				judgeIknai(_cnt);
 				g_workObj.diffListR.push(10);
-				lblTRatio.textContent = calculateTRatio();
+				lblRatio.textContent = calculateRatio();
 				g_attrObj[_frzName].judgEndFlg = true;
 				changeFailedFrz(_j, _k);
 			}
@@ -8938,7 +8952,6 @@ function MainInit() {
 		}
 	}
 	
-	//createDivErrorbar();
 
 	/**
 	 * フレーム処理(譜面台)
@@ -9393,14 +9406,14 @@ const checkJudgment = (_difCnt) => {
 const checkErrorbar = [];
 //ErrorBarの生成
 function createErrorbar (_difFrame) {
-	if (g_stateObj.d_special !== C_FLG_OFF) {
-		const _difCnt = Math.abs(_difFrame);
-		let jdgColor;
-		if (_difCnt <= 8) {
-			jdgColor = checkJudgment(_difCnt)[1].toLowerCase();
-		} else {
-			jdgColor = `uwan`;
-		}
+	const _difCnt = Math.abs(_difFrame);
+	let jdgColor;
+	if (_difCnt <= 8) {
+		jdgColor = checkJudgment(_difCnt)[1].toLowerCase();
+	} else {
+		jdgColor = `uwan`;
+	}
+	if (g_stateObj.errorbar === `Type1`) {
 		infoSprite.appendChild(createDivCss2Label(`bar_${g_barNo}`, g_lblNameObj.j_bar, {
 			x: g_headerObj.playingWidth / 2 - 5 * _difFrame, y: (g_sHeight + g_posObj.stepYR) / 2 - 80,
 				w: 0, h: 20, siz: C_SIZ_MAIN,
@@ -9411,6 +9424,17 @@ function createErrorbar (_difFrame) {
 		);
 		checkErrorbar[g_barNo] = g_scoreObj.frameNum;
 		g_barNo++;
+	}
+	if (g_stateObj.errorbar === `Type2`) {
+		if (document.getElementById(`bar`) !== null) {
+		let tempError = document.getElementById(`bar`);
+		tempError.parentNode.removeChild(tempError);
+		}
+		infoSprite.appendChild(createDivCss2Label(`bar`, g_lblNameObj.j_bar, {
+			x: g_headerObj.playingWidth / 2 - 5 * _difFrame, y: (g_sHeight + g_posObj.stepYR) / 2 - 80,
+				w: 0, h: 20, siz: C_SIZ_MAIN,
+			}, g_cssObj[`common_${jdgColor}`])
+		);			
 	}
 }
 
@@ -9446,7 +9470,7 @@ function judgeArrow(_j) {
 		if (_difCnt <= g_judgObj.arrowJ[g_judgPosObj.uwan]) {
 			g_workObj.diffListR.push(_difCnt);
 			createErrorbar(_difFrame);
-			lblTRatio.textContent = calculateTRatio();
+			lblRatio.textContent = calculateRatio();
 			const [resultFunc, resultJdg] = checkJudgment(_difCnt);
 			resultFunc(_difFrame);
 			countFastSlow(_difFrame, g_headerObj.justFrames);
@@ -9478,7 +9502,7 @@ function judgeArrow(_j) {
 			if (g_attrObj[frzName].keyUpFrame === 0 && g_attrObj[frzName].isMoving) {
 				g_workObj.diffListR.push(_difCnt);
 				createErrorbar(_difFrame);
-				lblTRatio.textContent = calculateTRatio();
+				lblRatio.textContent = calculateRatio();
 			}
 			changeHitFrz(_j, fcurrentNo, `frz`);
 			return true;
@@ -9740,7 +9764,7 @@ function finishViewing() {
 }
 
 	
-function calculateTRatio () {
+function calculateWRatio () {
 	/*function AppErfA (_argument) {
 		return 2 / (1 + Math.exp(-3.454 * _argument)) - 1;
 	}
@@ -9765,7 +9789,7 @@ function calculateTRatio () {
 			return AppErfA (_argument);
 		}
 	}*/
-	function TarwilCalc (_difFrame) {
+	function WifeCalc (_difFrame) {
 		const _difCnt = Math.abs(_difFrame);
 		switch (_difCnt) {
 			case 0: return 100;
@@ -9782,18 +9806,16 @@ function calculateTRatio () {
 		}
 	}
 	
-	let TC_sum = 0;
+	let WC_sum = 0;
 	for (let j = 0; j < g_workObj.diffListR.length; j++) {
-	TC_sum += TarwilCalc(g_workObj.diffListR[j]);
+	WC_sum += WifeCalc(g_workObj.diffListR[j]);
 	}
 	
-	const resultInt = Math.floor(TC_sum / g_workObj.diffListR.length);
-	const resultDecimal = Math.round((TC_sum / g_workObj.diffListR.length - resultInt) * 100) / 100;
-	const result = Math.floor( (resultInt + resultDecimal) * 100) / 100;
+	const result = (WC_sum / g_workObj.diffListR.length).toFixed(2);
 	return `${result}%`;
 }
 
-function calculateKaRatio () {
+function calculateKRatio () {
 	function KaCalc (_difFrame) {
 		const _difCnt = Math.abs(_difFrame);
 		if (_difCnt <= 1) {
@@ -9808,10 +9830,16 @@ function calculateKaRatio () {
 	for (let j = 0; j < g_workObj.diffListR.length; j++) {
 		KC_sum += KaCalc(g_workObj.diffListR[j]);
 	}
-	const resultInt = Math.floor(KC_sum / g_workObj.diffListR.length);
-	const resultDecimal = Math.round((KC_sum / g_workObj.diffListR.length - resultInt) * 100) / 100;
-	const result = Math.floor( (resultInt + resultDecimal) * 100) / 100;
+	const result = (KC_sum / g_workObj.diffListR.length).toFixed(2);
 	return `${result}%`;
+}
+
+function calculateRatio () {
+	if (g_stateObj.ratioType === `W-Ratio`) {
+		return calculateWRatio();
+	} else if (g_stateObj.ratioType === `K-Ratio`) {
+		return calculateKRatio();
+	}
 }
 
 function calculateEstAdj () {
@@ -9891,8 +9919,8 @@ function resultInit() {
 	const bayesExVal = 6 * bayesFunc(0, diffLength) / (diffLength * (diffLength + 1) * (diffLength + 2));
 	const estimatedAdj = (diffLength <= 20 ? `` : Math.round((g_stateObj.adjustment - bayesExVal) * 10) / 10);
 
-	const TarwilPercent = calculateTRatio();
-	const KaraPercent = calculateKaRatio();
+	const WifePercent = calculateWRatio();
+	const KaraPercent = calculateKRatio();
 
 	// 背景スプライトを作成
 	createMultipleSprite(`backResultSprite`, g_headerObj.backResultMaxDepth);
@@ -10058,9 +10086,9 @@ function resultInit() {
 			);
 		}
 		multiAppend(resultWindow,
-			makeCssResultSymbol(`lblTCalc`, 350, g_cssObj.common_ii, 4, `T-Ratio`),
-			makeCssResultSymbol(`lblTCalcS`, 260, g_cssObj.score, 5, TarwilPercent, C_ALIGN_RIGHT),		
-			makeCssResultSymbol(`lblKCalc`, 350, g_cssObj.common_uwan, 6, `辛判定`),
+			makeCssResultSymbol(`lblWCalc`, 350, g_cssObj.common_ii, 4, `W-Ratio`),
+			makeCssResultSymbol(`lblWCalcS`, 260, g_cssObj.score, 5, WifePercent, C_ALIGN_RIGHT),		
+			makeCssResultSymbol(`lblKCalc`, 350, g_cssObj.common_uwan, 6, `K-Ratio`),
 			makeCssResultSymbol(`lblKCalcS`, 260, g_cssObj.score, 7, KaraPercent, C_ALIGN_RIGHT),	
 		);
 	}
