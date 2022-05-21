@@ -1,45 +1,66 @@
-﻿'use strict';
+'use strict';
 /**
  * Dancing☆Onigiri 設定用jsファイル
- * Template Update: 2022/01/22 (v25.4.0)
+ * Template Update: 2022/02/23 (v26.3.1)
  * 
  * このファイルでは、作品全体に対しての初期設定を行うことができます。
  * 譜面データ側で個別に同様の項目が設定されている場合は、譜面データ側の設定が優先されます。
- * 例えばこのファイルで g_presetTuning = `onigiri` とすると全ての作品に製作者名として「onigiri」が設定されますが、
+ * 例えばこのファイルで g_presetObj.tuning = `onigiri` とすると全ての作品に製作者名として「onigiri」が設定されますが、
  * 譜面データ側で |tuning=washoi| とするとその作品には製作者名として「washoi」が設定されます。
  */
 
-// 譜面製作者名
-const g_presetTuning = `name`;
 
-// 譜面製作者URL
-const g_presetTuningUrl = `https://www.google.co.jp/`;
+/*
+------------------------------------------------------------------------
+   制作者クレジット 
+   https://github.com/cwtickle/danoniplus/wiki/dos-s0001-makerInfo 
+------------------------------------------------------------------------
+*/
 
-// 既定スキン (デフォルトは default)
-const g_presetSkinType = `default`;
+/** 譜面製作者名 */
+g_presetObj.tuning = `name`;
 
-// 既定カスタムJs (デフォルトは danoni_custom.js)
-//const g_presetCustomJs = `danoni_custom.js,danoni_init.js`;
+/** 譜面製作者URL */
+g_presetObj.tuningUrl = `https://www.google.co.jp/`;
 
-// 既定カスタムCss (デフォルトは指定なし、cssフォルダを参照)
-//const g_presetCustomCss = `danoni_custom.css`;
 
-// 背景・マスクモーションで使用する画像パスの指定方法を他の設定に合わせる設定 (trueで有効化)
-// const g_presetSyncBackPath = true;
+/*
+------------------------------------------------------------------------
+   カスタムファイル設定 
+   https://github.com/cwtickle/danoniplus/wiki/dos-s0002-customFile
+------------------------------------------------------------------------
+*/
 
-// ゲージ設定（デフォルト）
-const g_presetGauge = {
+/** 既定スキン (デフォルトは default) */
+g_presetObj.skinType = `default`;
+
+/** 既定カスタムJs (デフォルトは danoni_custom.js) */
+//g_presetObj.customJs = `danoni_custom.js,danoni_init.js`;
+
+/** 既定カスタムCss (デフォルトは指定なし、cssフォルダを参照) */
+//g_presetObj.customCss = `danoni_custom.css`;
+
+/** 背景・マスクモーションで使用する画像パスの指定方法を他の設定に合わせる設定 (trueで有効化) */
+//g_presetObj.syncBackPath = true;
+
+
+/*
+------------------------------------------------------------------------
+   ゲージ設定 
+   https://github.com/cwtickle/danoniplus/wiki/dos-s0003-initialGauge
+------------------------------------------------------------------------
+*/
+
+/** ゲージ設定（デフォルト）*/
+g_presetObj.gauge = {
 	//	Border: 70,  // ノルマ制でのボーダーライン、ライフ制にしたい場合は `x` を指定
 	//	Recovery: 2, // 回復量
 	//	Damage: 7,   // ダメージ量
 	//	Init: 25,    // 初期値
 };
 
-// フリーズアローのデフォルト色セットの利用有無 (true: 使用, false: 矢印色を優先してセット)
-const g_presetFrzColors = true;
-
-// ゲージ設定（デフォルト以外）
-const g_presetGaugeCustom = {
+/** ゲージ設定（デフォルト以外）*/
+g_presetObj.gaugeCustom = {
 	Easy: {
 		Border: 70,
 		Recovery: 4,
@@ -72,20 +93,53 @@ const g_presetGaugeCustom = {
 	}
 };
 
-// カスタムゲージ設定(デフォルト)
-// 'ゲージ名': `回復・ダメージ量設定`　の形式で指定します。
-// (F : 矢印数によらず固定, V: 矢印数により変動)
+/** 
+  カスタムゲージ設定(デフォルト)
+  'ゲージ名': `回復・ダメージ量設定`　の形式で指定します。
+  (F : 矢印数によらず固定, V: 矢印数により変動)
+*/
 /*
-const g_presetGaugeList = {
+g_presetObj.gaugeList = {
 	'Original': `F`,
 	'Normal': `V`,
 	'Hard': `V`,
 };
 */
 
+/*
+------------------------------------------------------------------------
+   フリーズアロー設定 
+   https://github.com/cwtickle/danoniplus/wiki/dos-s0004-frzArrow
+------------------------------------------------------------------------
+*/
+
+/** フリーズアローのデフォルト色セットの利用有無 (true: 使用, false: 矢印色を優先してセット) */
+g_presetObj.frzColors = true;
+
+/**
+  矢印色変化に対応してフリーズアロー色を追随する範囲の設定 (Normal: 通常時、Hit: ヒット時)
+  ※この設定は、g_presetObj.frzColors = false もしくは
+	譜面ヘッダー：defaultFrzColorUse=false のときにのみ有効です。
+*/
+//g_presetObj.frzScopeFromAC = [`Normal`, `Hit`];
+
+/**
+  フリーズアローの始点で通常矢印の判定を行うか(dotさんソース方式)
+  判定させる場合は `true` を指定
+*/
+g_presetObj.frzStartjdgUse = `false`;
+
+
+/*
+------------------------------------------------------------------------
+   デフォルトデザイン・画像設定
+   https://github.com/cwtickle/danoniplus/wiki/dos-s0005-defaultDesign
+------------------------------------------------------------------------
+*/
+
 // デフォルトのデザインを使用せず、独自のデザインを使用するかを指定
 // カスタムデザインにする場合は `true` を指定
-const g_presetCustomDesignUse = {
+g_presetObj.customDesignUse = {
 	title: `false`,
 	titleArrow: `false`,
 	titleAnimation: `false`,
@@ -94,9 +148,51 @@ const g_presetCustomDesignUse = {
 	ready: `false`,
 }
 
-// オプション利用設定（デフォルト）
-// 一律使用させたくない場合は `false` を指定（デフォルトは `true`）
-const g_presetSettingUse = {
+/**
+  デフォルト画像セットの設定
+  (セット対象のフォルダ名, 拡張子, 画像回転有無(true or false), Flat時ステップ間隔の順に指定)
+
+  事前に、[img]フォルダ配下にセット対象のサブフォルダを作成し、その中に一式を入れておく必要あり
+  下記の場合は[classic]フォルダに[png]形式の画像一式をデフォルト画像セットとして使用する
+
+  未指定の場合のデフォルト値は以下の通り
+	セット対象のフォルダ名：`` (imgフォルダ直下)
+	拡張子：`svg`形式
+	画像回転有無：true(回転有り)
+	Flat時ステップ間隔：50(px) ※矢印サイズ
+*/
+//g_presetObj.imageSets = [``, `classic,png`, `classic-thin,png`, `note,svg,false,0`];
+
+/**
+  デフォルト画像セット (C_IMG_XXXX, 厳密にはg_imgObj) に対して拡張子の上書きを行うか設定
+  文字列の後ろ3文字をカットして、下記の値を適用する。コメントアウトした場合は、上書きを行わない。
+	`svg`: デフォルト(svg形式)、`png`: 従来画像(png形式)
+*/
+//g_presetObj.overrideExtension = `svg`;
+
+/**
+  追加指定する画像のリスト（サーバ上の場合のみ有効）
+  ここで設定した画像をimgフォルダに指定した名前で格納しておくことで、
+  stepRtnX_Yで設定する名前に使用することができる
+
+  `ball`と指定した場合、下記の画像を準備する必要あり
+	- ball.svg, ballShadow.svg, ballStepHit.svg (g_presetOverrideExtension を pngにすれば、pngに変更可)
+*/
+//g_presetObj.customImageList = [`ball`, `square`];
+
+
+/*
+------------------------------------------------------------------------
+   オプション有効化
+   https://github.com/cwtickle/danoniplus/wiki/dos-s0006-settingUse
+------------------------------------------------------------------------
+*/
+
+/**
+  オプション利用設定（デフォルト）
+  一律使用させたくない場合は `false` を指定（デフォルトは `true`）
+*/
+g_presetObj.settingUse = {
 	motion: `true`,
 	scroll: `true`,
 	shuffle: `true`,
@@ -119,56 +215,50 @@ const g_presetSettingUse = {
 	//	special: `true`,
 };
 
-// フリーズアローの始点で通常矢印の判定を行うか(dotさんソース方式)
-// 判定させる場合は `true` を指定
-const g_presetFrzStartjdgUse = `false`;
-
 /*
-	デフォルト画像セットの設定
-	(セット対象のフォルダ名, 拡張子, 画像回転有無(true or false), Flat時ステップ間隔の順に指定)
-
-	事前に、[img]フォルダ配下にセット対象のサブフォルダを作成し、その中に一式を入れておく必要あり
-	下記の場合は[classic]フォルダに[png]形式の画像一式をデフォルト画像セットとして使用する
-
-	未指定の場合のデフォルト値は以下の通り
-	  セット対象のフォルダ名：`` (imgフォルダ直下)
-	  拡張子：`svg`形式
-	  画像回転有無：true(回転有り)
-	  Flat時ステップ間隔：50(px) ※矢印サイズ
-	  
+------------------------------------------------------------------------
+   プレイ画面制御
+   https://github.com/cwtickle/danoniplus/wiki/dos-s0007-viewControl
+------------------------------------------------------------------------
 */
- const g_presetImageSets = [``, `classic,png`, `classic-thin,png`, `note,svg,false,0`];
-
-// デフォルト画像セット (C_IMG_XXXX, 厳密にはg_imgObj) に対して拡張子の上書きを行うか設定
-// 文字列の後ろ3文字をカットして、下記の値を適用する。コメントアウトした場合は、上書きを行わない。
-// `svg`: デフォルト(svg形式)、`png`: 従来画像(png形式)
-
-// const g_presetOverrideExtension = `svg`;
 
 /**
- * 追加指定する画像のリスト（サーバ上の場合のみ有効）
- * ここで設定した画像をimgフォルダに指定した名前で格納しておくことで、
- * stepRtnX_Yで設定する名前に使用することができる
- * 
- * `ball`と指定した場合、下記の画像を準備する必要あり
- * - ball.svg, ballShadow.svg, ballStepHit.svg (g_presetOverrideExtension を pngにすれば、pngに変更可)
- */
-// const g_presetCustomImageList = [`ball`, `square`];
+  Reverse時の歌詞の自動反転制御設定
 
-/*
-	Reverse時の歌詞の自動反転制御設定
-
-	通常は以下の条件でReverseが指定された場合、歌詞表示を反転します。
-	この設定をどのように制御するか設定します。
+  通常は以下の条件でReverseが指定された場合、歌詞表示を反転します。
+  この設定をどのように制御するか設定します。
 	・上下スクロールを挟まないキーに限定（5key, 7key, 7ikey, 9A/9Bkeyなど）
 	・リバース・スクロール拡張用の歌詞表示（wordRev_data / wordAlt_data）が設定されていない作品
 	・SETTINGS 画面で Reverse：ON、Scroll：--- (指定なし) を指定してプレイ開始した場合
 	・歌詞表示がすべて1段表示の場合
 
-	＜設定可能の値＞
+  ＜設定可能の値＞
 	`auto`(既定)：上記ルールに従い設定 / `OFF`: 上記ルールに関わらず反転しない / `ON`: 上記ルールに関わらず反転する
 */
-// const g_presetWordAutoReverse = `auto`;
+//g_presetObj.wordAutoReverse = `auto`;
+
+/**
+ * フェードイン時にそれ以前のデータを蓄積しない種別(word, back, mask)を指定
+ */
+g_presetObj.unStockCategories = [];
+
+/** 
+ * フェードイン時、プリロードを強制削除するリスト（英字は小文字で指定）
+ * 指定例) back: [`fade`]   ※back_dataでアニメーション名に'fade'や'Fade'を含む
+ */
+g_presetObj.stockForceDelList = {
+	word: [],
+	back: [],
+	mask: [],
+};
+
+
+/*
+------------------------------------------------------------------------
+   リザルトデータ
+   https://github.com/cwtickle/danoniplus/wiki/dos-s0008-resultVals
+------------------------------------------------------------------------
+*/
 
 /*
 	リザルトデータのフォーマット設定
@@ -183,10 +273,10 @@ const g_presetFrzStartjdgUse = `false`;
 	   [url]       scoreId付きURL
 */
 // デフォルトフォーマット
-// const g_presetResultFormat = `【#danoni[hashTag]】[musicTitle]([keyLabel]) /[maker] /Rank:[rank]/Score:[score]/Playstyle:[playStyle]/[arrowJdg]/[frzJdg]/[maxCombo] [url]`;
+// g_presetObj.resultFormat = `【#danoni[hashTag]】[musicTitle]([keyLabel]) /[maker] /Rank:[rank]/Score:[score]/Playstyle:[playStyle]/[arrowJdg]/[frzJdg]/[maxCombo] [url]`;
 
 // MFV2さんフォーマット（オプション設定なし・参考）
-// const g_presetResultFormat = `【#danoni[hashTag]】[musicTitle]/[keyLabel] /[maker] /[rank]/[arrowJdg]/[frzJdg]/Mc[maxCombo]/Sco[score]-[exScore] [url]`;
+// g_presetObj.resultFormat = `【#danoni[hashTag]】[musicTitle]/[keyLabel] /[maker] /[rank]/[arrowJdg]/[frzJdg]/Mc[maxCombo]/Sco[score]-[exScore] [url]`;
 
 /*
 	リザルトデータ用のカスタム変数群
@@ -197,16 +287,24 @@ const g_presetFrzStartjdgUse = `false`;
 	   例) exScore: `exScores`,
 		   [exScore] -> g_resultObj.exScores
  */
-const g_presetResultVals = {
+g_presetObj.resultVals = {
 	// exScore: `exScore`,
 };
+
+
+/*
+------------------------------------------------------------------------
+   ラベルテキスト・メッセージの上書き
+   https://github.com/cwtickle/danoniplus/wiki/dos-s0009-labelUpdate
+------------------------------------------------------------------------
+*/
 
 /**
  * ラベルテキスト (g_lblNameObj) に対応するプロパティを上書きする設定
  * ※danoni_setting.js の他、customjsにも利用可
  * ※設定可能項目についてはdanoni_constants.jsをご覧ください。
  */
-const g_local_lblNameObj = {
+g_presetObj.lblName = {
 	Ja: {
 
 	},
@@ -220,7 +318,7 @@ const g_local_lblNameObj = {
  * ※danoni_setting.js の他、customjsにも利用可
  * ※設定可能項目についてはdanoni_constants.jsをご覧ください。
  */
-const g_local_msgObj = {
+g_presetObj.msg = {
 	Ja: {
 
 	},
@@ -232,7 +330,7 @@ const g_local_msgObj = {
 /**
  * 設定名の上書き可否設定
  */
-const g_lblRenames = {
+g_presetObj.lblRenames = {
 	option: true,
 	settingsDisplay: true,
 	main: true,
@@ -240,17 +338,49 @@ const g_lblRenames = {
 	result: true,
 };
 
-/**
- * フェードイン時にそれ以前のデータを蓄積しない種別(word, back, mask)を指定
- */
-const g_presetUnStockCategories = [];
 
-/** 
- * フェードイン時、プリロードを強制削除するリスト（英字は小文字で指定）
- * 指定例) back: [`fade`]   ※back_dataでアニメーション名に'fade'や'Fade'を含む
+/*
+------------------------------------------------------------------------
+   カスタムキー定義
+   https://github.com/cwtickle/danoniplus/wiki/dos-s0010-customKeys
+------------------------------------------------------------------------
+*/
+
+/**
+ * カスタムキー定義（共通）
+ * 指定方法は作品別にカスタムキーを定義する方法と同じ（ただし、keyExtraList必須）
+ * 
+ * 定義方法は下記を参照のこと
+ * https://github.com/cwtickle/danoniplus/wiki/keys
+ * https://github.com/cwtickle/danoniplus/wiki/tips-0004-extrakeys
  */
-const g_presetStockForceDelList = {
-	word: [],
-	back: [],
-	mask: [],
-};
+
+g_presetObj.keysData = `
+
+|keyExtraList=9j,9A,9B|
+|color9j=2,0,1,0,2,0,1,0,2|
+|chara9j=left,down,up,right,space,sleft,sdown,sup,sright|
+|pos9j=0,1,2,3,4,5,6,7,8,9,10|
+|div9j=9|
+|stepRtn9j=giko,0,-45,-90,onigiri,90,135,180,iyo|
+|keyCtrl9j=9/0,83/0,68/0,70/0,32/0,74/0,75/0,76/0,13/0|
+
+|color9A=0,0,0,0,2,3,3,3,3$0,0,0,0,2,3,3,3,3$3,0,3,0,2,0,3,0,3$0,0,2,0,0,2,3,3,2,3,3$0,0,2,0,0,2,3,3,2,3,3$2,0,1,0,2,0,1,0,2|
+|chara9A=left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,gor,up,right,space,sleft,sdown,siyo,sup,sright$left,down,gor,up,right,space,sleft,sdown,siyo,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright|
+|pos9A=0,1,2,3,4,5,6,7,8$0,1,2,3,4,5,6,7,8$0,1,2,3,4,5,6,7,8$0,1,2,3,4,5,6,7,8,9,10$0,1,2,3,4,5,6,7,8,9,10$0,1,2,3,4,5,6,7,8|
+|div9A=9$9$9$11$11$9|
+|stepRtn9A=0,-90,90,180,onigiri,0,-90,90,180$0,-90,90,180,onigiri,0,-90,90,180$45,0,-45,-90,onigiri,90,135,180,225$0,-90,giko,90,180,onigiri,0,-90,iyo,90,180$0,-135,giko,45,180,onigiri,0,-135,iyo,45,180$giko,0,-45,-90,onigiri,90,135,180,iyo|
+|keyCtrl9A=83/0,68/0,69/82,70/0,32/0,74/0,75/0,73/0,76/0$83/0,68/0,69/82,70/0,32/0,37/0,40/0,38/0,39/0$65/0,83/0,68/0,70/0,32/0,74/0,75/0,76/0,187/0$83/0,88/67,68/0,69/82,70/0,32/0,74/0,77/188,75/0,73/79,76/0$83/0,88/67,68/0,69/82,70/0,32/0,74/0,77/188,75/0,73/79,76/0$9/0,83/0,68/0,70/0,32/0,74/0,75/0,76/0,13/0|
+|shuffle9A=0,0,0,0,1,2,2,2,2$0,0,0,0,1,2,2,2,2$0,0,0,0,1,0,0,0,0$0,0,1,0,0,2,3,3,4,3,3$0,0,1,0,0,2,3,3,4,3,3$1,0,0,0,1,0,0,0,1|
+|transKey9A=$$$11i$11i$9j|
+
+|color9B=1,0,1,0,2,0,1,0,1$0,0,0,0,2,1,1,1,1$0,0,0,0,2,1,1,1,1$2,0,1,0,2,0,1,0,2|
+|chara9B=left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright|
+|pos9B=0,1,2,3,4,5,6,7,8,9,10$0,1,2,3,4,5,6,7,8,9,10$0,1,2,3,4,5,6,7,8,9,10$0,1,2,3,4,5,6,7,8,9,10|
+|div9B=9$9$9$9|
+|stepRtn9B=45,0,-45,-90,onigiri,90,135,180,225$0,-90,90,180,onigiri,0,-90,90,180$0,-90,90,180,onigiri,0,-90,90,180$giko,0,-45,-90,onigiri,90,135,180,iyo|
+|keyCtrl9B=65/0,83/0,68/0,70/0,32/0,74/0,75/0,76/0,187/0$83/0,68/0,69/82,70/0,32/0,74/0,75/0,73/0,76/0$83/0,68/0,69/82,70/0,32/0,37/0,40/0,38/0,39/0$9/0,83/0,68/0,70/0,32/0,74/0,75/0,76/0,13/0|
+|shuffle9B=0,0,0,0,1,0,0,0,0$0,0,0,0,1,2,2,2,2$0,0,0,0,1,2,2,2,2$1,0,0,0,1,0,0,0,1|
+|transKey9B=$9A$9A$9j|
+
+`;
