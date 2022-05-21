@@ -1,7 +1,7 @@
 'use strict';
 /**
  * Dancing☆Onigiri 設定用jsファイル
- * Template Update: 2022/02/23 (v26.3.1)
+ * Template Update: 2022/03/25 (v27.1.0)
  * 
  * このファイルでは、作品全体に対しての初期設定を行うことができます。
  * 譜面データ側で個別に同様の項目が設定されている場合は、譜面データ側の設定が優先されます。
@@ -12,7 +12,7 @@
 
 /*
 ------------------------------------------------------------------------
-   制作者クレジット 
+   制作者クレジット・基本設定 
    https://github.com/cwtickle/danoniplus/wiki/dos-s0001-makerInfo 
 ------------------------------------------------------------------------
 */
@@ -23,6 +23,14 @@ g_presetObj.tuning = `name`;
 /** 譜面製作者URL */
 g_presetObj.tuningUrl = `https://www.google.co.jp/`;
 
+/** 自動横幅拡張設定 (true:有効、false:無効 / デフォルトは true) */
+//g_presetObj.autoSpread = false;
+
+/** 個人サイト別の最小横幅設定 */
+//g_presetObj.autoMinWidth = 600;
+
+/** 個人サイト別のウィンドウ位置 (left:左寄せ, center:中央, right:右寄せ)*/
+//g_presetObj.windowAlign = `center`;
 
 /*
 ------------------------------------------------------------------------
@@ -42,7 +50,6 @@ g_presetObj.skinType = `default`;
 
 /** 背景・マスクモーションで使用する画像パスの指定方法を他の設定に合わせる設定 (trueで有効化) */
 //g_presetObj.syncBackPath = true;
-
 
 /*
 ------------------------------------------------------------------------
@@ -161,7 +168,7 @@ g_presetObj.customDesignUse = {
 	画像回転有無：true(回転有り)
 	Flat時ステップ間隔：50(px) ※矢印サイズ
 */
-//g_presetObj.imageSets = [``, `classic,png`, `classic-thin,png`, `note,svg,false,0`];
+g_presetObj.imageSets = [``, `classic,png`, `classic-thin,png`, `note,svg,false,0`];
 
 /**
   デフォルト画像セット (C_IMG_XXXX, 厳密にはg_imgObj) に対して拡張子の上書きを行うか設定
@@ -354,7 +361,6 @@ g_presetObj.lblRenames = {
  * https://github.com/cwtickle/danoniplus/wiki/keys
  * https://github.com/cwtickle/danoniplus/wiki/tips-0004-extrakeys
  */
-
 g_presetObj.keysData = `
 
 |keyExtraList=9j,9A,9B|
