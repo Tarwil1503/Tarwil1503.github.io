@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 /**
  * Dancing☆Onigiri (CW Edition)
  * 定数・初期設定用ファイル
@@ -787,7 +787,7 @@ const g_settings = {
 	errorbars: [C_FLG_OFF, `Type1`, `Type2`],
 	errorbarNum: 0,
 	
-	ratioTypes: [C_FLG_OFF, `W-Ratio`, `K-Ratio`],
+	ratioTypes: [C_FLG_OFF, `W-Ratio`, `K-Ratio`, `Gauge`],
 	ratioTypeNum: 0,
 
     scoreDetails: [`Speed`, `Density`, `ToolDif`],
