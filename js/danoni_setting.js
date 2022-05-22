@@ -370,6 +370,7 @@ g_presetObj.keysData = `
 |div9j=9|
 |stepRtn9j=giko,0,-45,-90,onigiri,90,135,180,iyo|
 |keyCtrl9j=9/0,83/0,68/0,70/0,32/0,74/0,75/0,76/0,13/0|
+|shuffle9j=1,0,0,0,1,0,0,0,1|
 
 |color9A=0,0,0,0,2,3,3,3,3$0,0,0,0,2,3,3,3,3$3,0,3,0,2,0,3,0,3$0,0,2,0,0,2,3,3,2,3,3$0,0,2,0,0,2,3,3,2,3,3$2,0,1,0,2,0,1,0,2|
 |chara9A=left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,gor,up,right,space,sleft,sdown,siyo,sup,sright$left,down,gor,up,right,space,sleft,sdown,siyo,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright|
