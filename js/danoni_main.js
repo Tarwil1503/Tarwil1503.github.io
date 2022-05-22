@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 /**
  * Dancing☆Onigiri (CW Edition)
  * 
@@ -8178,10 +8178,10 @@ const mainInit = _ => {
 			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: (g_stateObj.autoAll !== C_FLG_OFF) ? 0 : 0.85,
 		}, g_cssObj.common_uwan),
 		
-		//T-Ratio表示 ※色はiiとして表示される
+		//W-Ratio表示 ※色はiiとして表示される
 		createDivCss2Label(`lblRatio`, `00.00%`, {
 			x: g_headerObj.playingWidth / 2 + 5 * 8, y: (g_sHeight + g_posObj.stepYR) / 2 - 98, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: ( g_stateObj.autoAll !== C_FLG_OFF || g_stateObj.ratioType === C_FLG_OFF) ? 0 : 1,
-		}, (g_stateObj.ratioType === `W-Ratio`) ? g_cssObj.common_ii : g_cssObj.common_uwan),
+		}, (g_stateObj.ratioType === `W-Ratio`) ? g_cssObj.common_ii : ((g_stateObj.ratioType === `Gauge`) ? g_cssObj.common_shakin : g_cssObj.common_uwan)),
 
 		// 曲名・アーティスト名表示
 		createDivCss2Label(`lblCredit`, creditName, {
@@ -9745,11 +9745,32 @@ function calculateKRatio () {
 	return `${result}%`;
 }
 
+function calculateGauge () {
+	function GaugeCalc (_difFrame) {
+		const _difCnt = Math.abs(_difFrame);
+		if (_difCnt <= g_judgObj.arrowJ[1]) {
+			return g_workObj.lifeRcv;
+		} else if (_difCnt <= g_judgObj.arrowJ[2]) {
+			return 0;
+		} else {
+			return -g_workObj.lifeDmg;
+		}
+	}
+	let Gauge_sum = 0;
+	for (let j = 0; j < g_workObj.diffListR.length; j++) {
+		Gauge_sum += GaugeCalc (g_workObj.diffListR[j]);
+	}
+	const result = (100 * (Gauge_sum + g_workObj.lifeDmg * g_workObj.diffListR.length) / ((g_workObj.lifeRcv + g_workObj.lifeDmg) * g_workObj.diffListR.length)).toFixed(2);
+	return `${result}%`;
+}
+
 function calculateRatio () {
 	if (g_stateObj.ratioType === `W-Ratio`) {
 		return calculateWRatio();
 	} else if (g_stateObj.ratioType === `K-Ratio`) {
 		return calculateKRatio();
+	} else if (g_stateObj.ratioType === `Gauge`) {
+		return calculateGauge();
 	}
 }
 
@@ -9831,6 +9852,7 @@ const resultInit = _ => {
 	
 	const WifePercent = calculateWRatio();
 	const KaraPercent = calculateKRatio();
+	const GaugePercent = calculateGauge();
 
 	// 背景スプライトを作成
 	createMultipleSprite(`backResultSprite`, g_headerObj.backResultMaxDepth);
@@ -9982,7 +10004,7 @@ const resultInit = _ => {
 		);
 		if (estimatedAdj !== ``) {
 			multiAppend(resultWindow,
-				makeCssResultSymbol(`lblAdj`, 420, g_cssObj.common_shakin, 4, g_lblNameObj.j_adj),
+				makeCssResultSymbol(`lblAdj`, 420, g_cssObj.common_kita, 4, g_lblNameObj.j_adj),
 				makeCssResultSymbol(`lblAdjS`, 330, g_cssObj.score, 5, `${getDiffFrame(estimatedAdj)}`, C_ALIGN_RIGHT),
 			);
 		}
@@ -9991,6 +10013,8 @@ const resultInit = _ => {
 			makeCssResultSymbol(`lblWCalcS`, 260, g_cssObj.score, 5, WifePercent, C_ALIGN_RIGHT),		
 			makeCssResultSymbol(`lblKCalc`, 350, g_cssObj.common_uwan, 6, `K-Ratio`),
 			makeCssResultSymbol(`lblKCalcS`, 260, g_cssObj.score, 7, KaraPercent, C_ALIGN_RIGHT),	
+			makeCssResultSymbol(`lblGCalc`, 420, g_cssObj.common_shakin, 6, `Gauge`),
+			makeCssResultSymbol(`lblGCalcS`, 330, g_cssObj.score, 7, GaugePercent, C_ALIGN_RIGHT),
 		);
 	}
 
