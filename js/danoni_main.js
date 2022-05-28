@@ -9398,6 +9398,8 @@ const judgeArrow = _j => {
  */
 const displayDiff = (_difFrame, _justFrames = 0) => {
 	let diffJDisp = ``;
+	lblEstAdj.style.left = `${g_headerObj.playingWidth / 2 - 5 * calculateEstAdj()}px`;
+	lblEstAdj.style.zIndex = 100;
 	g_workObj.diffList.push(_difFrame);
 	const difCnt = Math.abs(_difFrame);
 	if (_difFrame > _justFrames) {
