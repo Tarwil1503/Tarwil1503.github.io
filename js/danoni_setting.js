@@ -363,14 +363,15 @@ g_presetObj.lblRenames = {
  */
 g_presetObj.keysData = `
 
-|keyExtraList=9j,9A,9B|
-|color9j=2,0,1,0,2,0,1,0,2|
-|chara9j=left,down,up,right,space,sleft,sdown,sup,sright|
-|pos9j=0,1,2,3,4,5,6,7,8,9,10|
-|div9j=9|
-|stepRtn9j=giko,0,-45,-90,onigiri,90,135,180,iyo|
-|keyCtrl9j=9/0,83/0,68/0,70/0,32/0,74/0,75/0,76/0,13/0|
-|shuffle9j=1,0,0,0,1,0,0,0,1|
+|keyExtraList=9j,9A,9B,12i|
+|color9j=2,0,1,0,2,0,1,0,2$0,0,0,0,2,3,3,3,3$0,0,0,0,2,3,3,3,3$1,0,1,0,2,0,1,0,1|
+|chara9j=left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright|
+|pos9j=0,1,2,3,4,5,6,7,8,9,10$0,1,2,3,4,5,6,7,8,9,10$0,1,2,3,4,5,6,7,8$0,1,2,3,4,5,6,7,8,9,10|
+|div9j=9$9$9$9|
+|stepRtn9j=giko,0,-45,-90,onigiri,90,135,180,iyo$0,-90,90,180,onigiri,0,-90,90,180$0,-90,90,180,onigiri,0,-90,90,180$45,0,-45,-90,onigiri,90,135,180,225|
+|keyCtrl9j=9/0,83/0,68/0,70/0,32/0,74/0,75/0,76/0,13/0$83/0,68/0,69/82,70/0,32/0,74/0,75/0,73/0,76/0$83/0,68/0,69/82,70/0,32/0,37/0,40/0,38/0,39/0$65/0,83/0,68/0,70/0,32/0,74/0,75/0,76/0,187/0|
+|shuffle9j=1,0,0,0,1,0,0,0,1$0,0,0,0,1,2,2,2,2$0,0,0,0,1,2,2,2,2$0,0,0,0,1,0,0,0,0|
+|transKey9j=$9A$9A$9B|
 
 |color9A=0,0,0,0,2,3,3,3,3$0,0,0,0,2,3,3,3,3$3,0,3,0,2,0,3,0,3$0,0,2,0,0,2,3,3,2,3,3$0,0,2,0,0,2,3,3,2,3,3$2,0,1,0,2,0,1,0,2|
 |chara9A=left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,gor,up,right,space,sleft,sdown,siyo,sup,sright$left,down,gor,up,right,space,sleft,sdown,siyo,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright|
@@ -390,4 +391,12 @@ g_presetObj.keysData = `
 |shuffle9B=0,0,0,0,1,0,0,0,0$0,0,0,0,1,2,2,2,2$0,0,0,0,1,2,2,2,2$1,0,0,0,1,0,0,0,1|
 |transKey9B=$9A$9A$9j|
 
+|color12i=1,0,1,0,3,3,3,3,0,1,0,1$12_0|
+|chara12i=oni,left,leftdia,down,sleft,sdown,sup,sright,space,up,rightdia,right$12_0|
+|shuffle12i=0,0,0,0,1,1,1,1,2,2,2,2$12_0|
+|stepRtn12i=45,0,-45,-90,giko,onigiri,iyo,c,90,135,180,225$12_0|
+|pos12i=0,1,2,3,4,5,6,7,8,9,10,11$12_0|
+|keyCtrl12i=112/0,113/0,114/0,115/0,116/0,117/0,118/0,119/0,120/0,121/0,122/0,123/0$12_0|
+|div12i=12$5|
+|transKey12i=$12|
 `;
