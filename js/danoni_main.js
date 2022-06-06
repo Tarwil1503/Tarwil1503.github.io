@@ -8170,12 +8170,12 @@ const mainInit = _ => {
 
 		//誤差表示(棒)
 		createDivCss2Label(`lblHitError`, g_lblNameObj.j_bar, {
-			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: (g_stateObj.autoAll !== C_FLG_OFF) ? 0 : 0.6,
+			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: (g_stateObj.autoAll !== C_FLG_OFF) ? 0 : 0.6, display: g_workObj.specialDisp,
 		}),
 		
 		//推定Adj表示(棒)　※色はuwanとして出力される
 		createDivCss2Label(`lblEstAdj`, g_lblNameObj.j_bar, {
-			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: (g_stateObj.autoAll !== C_FLG_OFF) ? 0 : 0.85,
+			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: (g_stateObj.autoAll !== C_FLG_OFF) ? 0 : 0.85, display: g_workObj.specialDisp,
 		}, g_cssObj.common_uwan),
 		
 		//W-Ratio表示 ※色はiiとして表示される
