@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 /**
  * Dancing☆Onigiri 設定用jsファイル
  * Template Update: 2022/03/25 (v27.1.0)
@@ -363,7 +363,7 @@ g_presetObj.lblRenames = {
  */
 g_presetObj.keysData = `
 
-|keyExtraList=9j,9A,9B,12i|
+|keyExtraList=9j,9A,9B,12,12i,12F|
 |color9j=2,0,1,0,2,0,1,0,2$0,0,0,0,2,3,3,3,3$0,0,0,0,2,3,3,3,3$1,0,1,0,2,0,1,0,1|
 |chara9j=left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright|
 |pos9j=0,1,2,3,4,5,6,7,8,9,10$0,1,2,3,4,5,6,7,8,9,10$0,1,2,3,4,5,6,7,8$0,1,2,3,4,5,6,7,8,9,10|
@@ -399,4 +399,25 @@ g_presetObj.keysData = `
 |keyCtrl12i=112/0,113/0,114/0,115/0,116/0,117/0,118/0,119/0,120/0,121/0,122/0,123/0$12_0|
 |div12i=12$5|
 |transKey12i=$12|
+
+
+|chara12F=sleft,sdown,sup,sright,oni,left,leftdia,down,space,up,rightdia,right|
+|color12F=3,3,3,3,0,0,0,0,1,1,1,1|
+|shuffle12F=0,0,0,0,1,2,2,2,2,2,2,2|
+|stepRtn12F=0,-90,90,180,onigiri,0,30,60,90,120,150,180|
+|pos12F=1,2,3,4,5,6,7,8,9,10,11,12|
+|keyCtrl12F=120/0,121/0,122/0,123/0,112/0,113/0,114/0,115/0,116/0,117/0,118/0,119/0|
+|div12F=5|
+
+|chara12=12_0$12_1$12_2$12_3$oni,left,leftdia,down,sleft,sdown,sup,sright,space,up,rightdia,right$oni,left,leftdia,down,sleft,sdown,sup,sright,space,up,rightdia,right$sleft,sdown,sup,sright,oni,left,leftdia,down,space,up,rightdia,right|
+|color12=12_0$12_1$12_2$12_3$1,0,1,0,3,3,3,3,0,1,0,1$1,0,1,0,3,3,3,3,0,1,0,1$3,3,3,3,0,0,0,0,1,1,1,1|
+|div12=5$5$5$5$$$5|
+|keyCtrl12=12_0$12_1$12_2$12_3$112/0,113/0,114/0,115/0,116/0,117/0,118/0,119/0,120/0,121/0,122/0,123/0$81/0,87/0,69/0,82/0,84/0,89/0,85/0,73/0,79/0,80/0,192/0,219/0$120/0,121/0,122/0,123/0,112/0,113/0,114/0,115/0,116/0,117/0,118/0,119/0|
+|pos12=12_0$12_1$12_2$12_3$0,1,2,3,4,5,6,7,8,9,10,11$0,1,2,3,4,5,6,7,8,9,10,11$1,2,3,4,5,6,7,8,9,10,11,12|
+|scroll12=Flat::1,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1$12_0$12_0$12_0$Cross::1,1,1,1,-1,-1,-1,-1,1,1,1,1/Split::1,1,1,1,1,1,-1,-1,-1,-1,-1,-1|
+|shuffle12=12_0$12_1$12_2$12_3$0,0,0,0,1,1,1,1,2,2,2,2$0,0,0,0,1,1,1,1,2,2,2,2$0,0,0,0,1,2,2,2,2,2,2,2|
+|stepRtn12=12_0$12_1$12_2$12_3$45,0,-45,-90,giko,onigiri,iyo,c,90,135,180,225$45,0,-45,-90,giko,onigiri,iyo,c,90,135,180,225$0,-90,90,180,onigiri,0,30,60,90,120,150,180|
+|blank12=55$55$55$55$50$50$55|
+|transKey12=$$$$12i$12i$12F|
+
 `;

@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 /**
  * Dancing☆Onigiri (CW Edition)
  * 
@@ -9723,9 +9723,12 @@ function calculateWRatio () {
 	for (let j = 0; j < g_workObj.diffListR.length; j++) {
 	WC_sum += WifeCalc(g_workObj.diffListR[j]);
 	}
-	
-	const result = (WC_sum / g_workObj.diffListR.length).toFixed(2);
-	return `${result}%`;
+	if (g_workObj.diffListR.length !== 0) {
+		const result = (WC_sum / g_workObj.diffListR.length).toFixed(2);
+		return `${result}%`;
+	} else {
+		return `0.00%`;
+	}
 }
 
 function calculateKRatio () {
@@ -9743,8 +9746,12 @@ function calculateKRatio () {
 	for (let j = 0; j < g_workObj.diffListR.length; j++) {
 		KC_sum += KaCalc(g_workObj.diffListR[j]);
 	}
-	const result = (KC_sum / g_workObj.diffListR.length).toFixed(2);
-	return `${result}%`;
+	if (g_workObj.diffListR.length !== 0) {	
+		const result = (KC_sum / g_workObj.diffListR.length).toFixed(2);
+		return `${result}%`;
+	} else {
+		return `0.00%`;
+	}
 }
 
 function calculateGauge () {
@@ -9762,8 +9769,13 @@ function calculateGauge () {
 	for (let j = 0; j < g_workObj.diffListR.length; j++) {
 		Gauge_sum += GaugeCalc (g_workObj.diffListR[j]);
 	}
-	const result = (100 * (Gauge_sum + g_workObj.lifeDmg * g_workObj.diffListR.length) / ((g_workObj.lifeRcv + g_workObj.lifeDmg) * g_workObj.diffListR.length)).toFixed(2);
-	return `${result}%`;
+	
+	if ((g_workObj.lifeRcv + g_workObj.lifeDmg) * g_workObj.diffListR.length !== 0) {
+		const result = (100 * (Gauge_sum + g_workObj.lifeDmg * g_workObj.diffListR.length) / ((g_workObj.lifeRcv + g_workObj.lifeDmg) * g_workObj.diffListR.length)).toFixed(2);
+		return `${result}%`;
+	} else {
+		return `0.00%`;
+	}
 }
 
 function calculateRatio () {
