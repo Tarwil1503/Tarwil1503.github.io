@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 function customTitleInit() {
 
@@ -15,5 +15,8 @@ function customTitleInit() {
 		}
 	}
 	viewGroup("color");
+	document.getElementById("lblArrow").style.transform = 'rotate(270deg)';
+	document.getElementById("lblArrow").style.opacity = 0.1;
+	document.getElementById("lblmusicTitle1").style.animationTimingFunction = 'cubic-bezier(.71,.84,.27,.93)';
 
 }
