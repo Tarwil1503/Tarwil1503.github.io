@@ -19,3 +19,15 @@ function customTitleInit() {
 	document.getElementById("lblArrow").style.opacity = 0.02;
 
 }
+
+function customMainEnterFrame() {
+	if (g_scoreObj.frameNum >= 14113) {
+		if (document.getElementById("lblHitError") !== null) {
+			document.getElementById("lblHitError").style.display = C_DIS_NONE;
+		}
+		if (document.getElementById("lblEstAdj") !== null) {
+			document.getElementById("lblEstAdj").style.display = C_DIS_NONE;
+		}
+		
+	}
+}
