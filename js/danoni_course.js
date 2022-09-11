@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 /**
  * Dancing☆Onigiri カスタム用jsファイル
  * その１：共通設定用
@@ -43,11 +43,13 @@
 const g_damageReductionFrom = 300;
 
 // 補正を適用「しない」ゲージを指定してください
-const g_gaugesWithoutDamageReduction = ["Superior"];
+const g_gaugesWithoutDamageReduction = ["Sofa"];
 
 // ステージ完走後にライフ回復を適用するゲージと、その回復量を指定してください
 // ※回復量: 直前に完走したステージでのダメージ量を1とした値。10であれば、10ミス分のライフを回復します。
 const g_gaugeWithRecoveryAtEnd = {
+	gauge: [],
+	recovery: []
 };
 
 // Readyの代わりに表示される曲名のフォントサイズを指定してください
@@ -104,7 +106,7 @@ function customLoadingProgress(_event) {
 function customTitleInit() {
 
 	// バージョン表記
-	g_localVersion = `1.2.0`;
+	g_localVersion = `1.2.1`;
 
 	// コース初期化
 	resetCourse();
@@ -359,8 +361,10 @@ function customResultInit() {
 		const keys = Object.keys(g_resultObj);
 		keys.forEach(key => {
 			if (typeof g_resultObj[key] === "number") {
-				if (key.includes("combo") || key.includes("Combo")) {
-					g_accumulatedResultObj[key] = g_resultObj[key];
+				if (key === "maxCombo") {
+					g_accumulatedResultObj.maxCombo = g_maxCombo;
+				} else if (key === "fmaxCombo"){
+					g_accumulatedResultObj.fmaxCombo = g_fmaxCombo;
 				} else {
 					g_accumulatedResultObj[key] += g_resultObj[key];
 				}
@@ -420,8 +424,6 @@ function customResultInit() {
 			g_resultObj[key] = g_accumulatedResultObj[key];
 		});
 
-		g_resultObj.maxCombo = g_maxCombo;
-		g_resultObj.fmaxCombo = g_fmaxCombo;
 		g_fullArrows = getCourseFullArrows();
 
 		// 実際に判定された数はランク計算に必要
@@ -453,26 +455,25 @@ function customResultInit() {
 	}
 	
 	function getCourseFullArrows() {
-		const allArrows = g_detailObj.arrowCnt.reduce((accum, myArray) => {
+		g_allArrow = g_detailObj.arrowCnt.reduce((accum, myArray) => {
 			return accum + myArray.reduce((accum, num) => {
 				return accum + num;
 			}, 0);
 		}, 0);
 	
-		const allFrzs = g_detailObj.frzCnt.reduce((accum, myArray) => {
+		g_allFrz = g_detailObj.frzCnt.reduce((accum, myArray) => {
 			return accum + myArray.reduce((accum, num) => {
 				return accum + num;
 			}, 0);
 		}, 0);
-	
-		// フリーズ始点判定の有無で総矢印数を変更
-		if (g_headerObj.frzStartjdgUse === true) {
-			return allArrows + allFrzs * 2;
-		} else {
-			return allArrows + allFrzs;
-		}
-	}
 
+		// フリーズ始点判定がある場合は通常矢印数を上乗せ
+		if (g_headerObj.frzStartjdgUse === true) {
+			g_allArrow += g_allFrz;
+		}
+
+		return g_allArrow + g_allFrz;
+	}
 }
 
 /**
