@@ -56,7 +56,6 @@ const g_gaugeWithRecoveryAtEnd = {
 const g_courseNameFontSize = 28;
 
 
-
 // その他のグローバル変数
 
 let g_accumulatedResultObj = {
@@ -106,7 +105,7 @@ function customLoadingProgress(_event) {
 function customTitleInit() {
 
 	// バージョン表記
-	g_localVersion = `1.2.1`;
+	g_localVersion = `2.0.0`;
 
 	// コース初期化
 	resetCourse();
@@ -132,31 +131,49 @@ function customTitleEnterFrame() {
  * オプション画面(初期表示) [Scene: Option / Lime]
  */
 function customOptionInit() {
-	// 譜面名の代わりにコース名を表示
-	const lnkDifficulty = document.querySelector("#lnkDifficulty");
-	lnkDifficulty.innerText = g_rootObj.courseName;
 
-	if (getStrLength(lnkDifficulty.innerText) > 25) {
-		lnkDifficulty.style.fontSize = `14px`;
-	} else if (getStrLength(lnkDifficulty.innerText) > 18) {
-		lnkDifficulty.style.fontSize = `16px`;
+	document.querySelector("#lnkDifficultyL").remove();
+	document.querySelector("#lnkDifficultyR").remove();
+	
+	const lnkDifficulty = document.querySelector("#lnkDifficulty");
+	lnkDifficulty.style.left = "120px";
+	lnkDifficulty.style.width = "290px";
+
+	const currentStage = getStageNum(g_stateObj.scoreId, g_headerObj.keyLabels.length - 1);
+	const songName = `${g_headerObj.musicTitles[g_stateObj.scoreId]}`;
+
+	let songFontSize = 16;
+
+	if (getStrLength(songName) > 25) {
+		songFontSize = 14;
+	} else if (getStrLength(songName) > 18) {
+		songFontSize = 16;
 	}
+
+	const stageNumFontSize = Math.ceil(songFontSize * 0.8);
+
+	// 譜面名の代わりに曲名を表示
+	lnkDifficulty.innerHTML = `<span style="font-size:${stageNumFontSize}px">${currentStage} stage</span>\n<span style="font-size:${songFontSize}px">${songName}</span>`;
 
 	// コースの途中では設定不可の項目
 	if (g_stateObj.scoreId > 1) {
 		g_btnDeleteFlg.btnBack = true;
+
 		g_btnDeleteFlg.lnkGauge = true;
 		g_btnDeleteFlg.lnkGaugeL = true;
 		g_btnDeleteFlg.lnkGaugeR = true;
+
 		g_btnDeleteFlg.lnkAutoPlay = true;
 		g_btnDeleteFlg.lnkAutoPlayL = true;
 		g_btnDeleteFlg.lnkAutoPlayR = true;
+
+		g_cxtDeleteFlg.lnkGauge = true;
+		g_cxtDeleteFlg.lnkAutoPlay = true;
 	}
 
 	// 最初から設定不可の項目
 	g_btnDeleteFlg.lnkDifficulty = true;
-	g_btnDeleteFlg.lnkDifficultyL = true;
-	g_btnDeleteFlg.lnkDifficultyR = true;
+	g_cxtDeleteFlg.lnkDifficulty = true;
 
 	g_btnDeleteFlg.lnkFadeinL = true;
 	g_btnDeleteFlg.lnkFadeinR = true;
@@ -191,7 +208,7 @@ function customLoadingInit() {
 
 	g_headerObj.keyRetry = C_KEY_RETRY;
 
-	const stageNum = getStageNum(g_stateObj.scoreId, g_headerObj.keyLabels.length)
+	const stageNum = getStageNum(g_stateObj.scoreId, g_headerObj.keyLabels.length - 1);
 	g_headerObj.readyHtml = `<span style="font-size:${g_courseNameFontSize}px">${stageNum} stage<br>${g_headerObj.musicTitles[g_stateObj.scoreId]} [${g_headerObj.difLabels[g_stateObj.scoreId]}]</span>`
 
 	// リトライ時などに、曲の途中までで獲得したコンボをリセット
@@ -199,32 +216,6 @@ function customLoadingInit() {
 	g_fcombo = g_preFcombo;
 	g_maxCombo = g_preMaxCombo;
 	g_fmaxCombo = g_preFmaxCombo;
-
-	function getStageNum(current, max) {
-		let order;
-		if (current + 1 === max) {
-			order = "Final";
-		} else {
-			switch (current % 10) {
-				case 1:
-					order = String(current) + "st";
-					break;
-
-				case 2:
-					order = String(current) + "nd";
-					break;
-
-				case 3:
-					order = String(current) + "rd";
-					break;
-
-				default:
-					order = String(current) + "th";
-					break;
-			}
-		}
-		return order;
-	}
 }
 
 /**
@@ -238,13 +229,13 @@ function customMainInit() {
  * メイン画面(フレーム毎表示) [Scene: Main / Banana]
  */
 function customMainEnterFrame() {
-	// 開始15秒以内であればリトライ可能
-	if (g_scoreObj.frameNum === 15 * 60) {
+	// 開始20秒以内であればリトライ可能
+	if (g_scoreObj.frameNum === 20 * 60) {
 		g_headerObj.keyRetry = 0;
 	}
 
-	// 開始15秒以内であればオプション設定画面に戻ることができる
-	if (g_scoreObj.frameNum < 15 * 60 && keyIsDown(g_kCd[C_KEY_TITLEBACK])) {
+	// 開始20秒以内であればオプション設定画面に戻ることができる
+	if (keyIsDown(g_kCd[C_KEY_TITLEBACK]) && g_scoreObj.frameNum < 20 * 60) {
 		setTimeout(optionInit2, 0);
 	}
 
@@ -255,8 +246,6 @@ function customMainEnterFrame() {
 		optionInit();
 	}
 }
-
-
 
 /**
  * 結果画面(初期表示) [Scene: Result / Grape]
@@ -278,10 +267,12 @@ function customResultInit() {
 
 				// 生存かつ最後の譜面ではない場合
 				g_lblNameObj.b_retry = "Next";
-				g_lblNameObj.b_back = "Back";
+				g_lblNameObj.b_back = "-";
 				g_btnDeleteFlg.btnBack = true;
 				g_btnDeleteFlg.btnRetry = true;
-				g_btnAddFunc.btnBack = _ => {
+
+				g_btnAddFunc.btnRetry = _ => {
+
 					g_lblNameObj.b_back = "-";
 					g_stateObj.scoreId++;
 					g_keyObj.currentPtn = 0;
@@ -296,28 +287,8 @@ function customResultInit() {
 					clearTimeout(g_timeoutEvtId);
 					clearTimeout(g_timeoutEvtResultId);
 					g_audio.pause();
-					setTimeout(optionInit, 50);
-				};
-
-				g_btnAddFunc.btnRetry = _ => {
-					g_stateObj.scoreId++;
-					g_keyObj.currentPtn = 0;
-					g_gaugeOptionObj[`gauge${g_stateObj.gauge}s`].lifeInits[g_stateObj.scoreId] = getNewLifeInit();
-
-					const url = getUrlWithResetParam("stageNum", g_stateObj.scoreId);
-				
-					history.replaceState(null, document.title, url);
-
-					loadLocalStorage();
-
-					clearTimeout(g_timeoutEvtId);
-					clearTimeout(g_timeoutEvtResultId);
-					g_audio.pause();
-					setTimeout(() => {
-						optionInit();
-						loadMusic();
-					}, 50);
-				};
+					setTimeout(optionInit, 0);
+				}
 			} else {
 
 				// 生存かつ最後の譜面の場合
@@ -333,10 +304,9 @@ function customResultInit() {
 
 			// 途中落ちの場合
 			g_lblNameObj.b_retry = "Result";
-			g_lblNameObj.b_back = "-";
+			g_lblNameObj.b_back = "Back";
 
 			g_btnDeleteFlg.btnRetry = true;
-			g_btnDeleteFlg.btnBack = true;
 
 			g_btnAddFunc.btnRetry = toCourseResult;
 		}
@@ -354,7 +324,18 @@ function customResultInit() {
 		g_gaugeOptionObj[`gauge${g_stateObj.gauge}s`].lifeInits.fill(100);
 
 		// リトライ選択時はコースを初期化
-		g_btnAddFunc.btnRetry = resetCourse;
+		g_btnDeleteFlg.btnRetry = true;
+		g_btnAddFunc.btnRetry = _ => {
+			g_audio.pause();
+			clearTimeout(g_timeoutEvtId);
+			clearTimeout(g_timeoutEvtResultId);
+
+			resetCourse();
+			setTimeout(() =>{
+				optionInit();
+				loadMusic();
+			}, 0)
+		}
 	}
 
 	function calcAccumulatedResults() {
@@ -451,7 +432,7 @@ function customResultInit() {
 		clearTimeout(g_timeoutEvtId);
 		clearTimeout(g_timeoutEvtResultId);
 		g_audio.pause();
-		setTimeout(resultInit, 50);
+		setTimeout(resultInit, 0);
 	}
 	
 	function getCourseFullArrows() {
@@ -481,6 +462,32 @@ function customResultInit() {
  */
 function customResultEnterFrame() {
 
+}
+
+function getStageNum(current, max) {
+	let order;
+	if (current === max) {
+		order = "Final";
+	} else {
+		switch (current % 10) {
+			case 1:
+				order = String(current) + "st";
+				break;
+
+			case 2:
+				order = String(current) + "nd";
+				break;
+
+			case 3:
+				order = String(current) + "rd";
+				break;
+
+			default:
+				order = String(current) + "th";
+				break;
+		}
+	}
+	return order;
 }
 
 // コースの初期化
@@ -516,6 +523,8 @@ function resetCourse() {
 	};
 
 	g_stateObj.scoreId = 1;
+	g_keyObj.currentKey = g_headerObj.keyLabels[g_stateObj.scoreId];
+	g_keyObj.currentPtn = 0;
 
 	const url = getUrlWithResetParam("stageNum", g_stateObj.scoreId);
 
@@ -529,7 +538,6 @@ function getUrlWithResetParam(paramName, val) {
 	url.searchParams.append(paramName, val);
 	return url;
 }
-
 
 /**
  * 判定カスタム処理 (引数は共通で1つ保持)
