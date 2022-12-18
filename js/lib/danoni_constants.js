@@ -1,11 +1,11 @@
-﻿'use strict';
+'use strict';
 /**
  * Dancing☆Onigiri (CW Edition)
  * 定数・初期設定用ファイル
  *
  * Source by tickle
  * Created : 2019/11/19
- * Revised : 2022/05/21 (v27.5.0)
+ * Revised : 2022/12/09 (v29.3.1)
  *
  * https://github.com/cwtickle/danoniplus
  */
@@ -135,6 +135,7 @@ const updateWindowSiz = _ => {
         lblComment: {
             x: 0, y: 70, w: g_sWidth, h: g_sHeight - 180, siz: C_SIZ_DIFSELECTOR, align: C_ALIGN_LEFT,
             overflow: `auto`, background: `#222222`, color: `#cccccc`, display: C_DIS_NONE,
+            whiteSpace: `normal`,
         },
         btnComment: {
             x: g_sWidth - 160, y: (g_sHeight / 2) + 150, w: 140, h: 50, siz: 20, border: `solid 1px #999999`,
@@ -171,13 +172,6 @@ const updateWindowSiz = _ => {
         },
 
         /** 設定: 譜面明細子画面 */
-        lnkScoreDetailB: {
-            x: 10, w: 100, visibility: `hidden`,
-        },
-        lnkScoreDetail: {
-            x: 10, w: 100, borderStyle: `solid`,
-        },
-
         lblTooldif: {
             y: 5, w: 250, siz: C_SIZ_JDGCNTS,
         },
@@ -207,7 +201,7 @@ const updateWindowSiz = _ => {
             x: 140, y: 70, w: 275, h: 150, overflow: `auto`,
         },
         lnkDifInfo: {
-            x: 10, y: 30, w: 100, borderStyle: `solid`,
+            w: C_LEN_DIFCOVER_WIDTH, borderStyle: `solid`,
         },
 
         /** ディスプレイ画面 */
@@ -245,7 +239,7 @@ const updateWindowSiz = _ => {
             x: 0, w: 50, h: 15, siz: 11, align: C_ALIGN_LEFT, background: `#${g_headerObj.baseBrightFlg ? `eeeeee` : `111111`}80`,
         },
         lnkColorCopy: {
-            x: 35, y: -5, w: 30, h: 20, siz: 14,
+            x: 35, y: -5, w: 30, h: 20, siz: 14, title: g_msgObj.pickColorCopy,
         },
 
         btnKcBack: {
@@ -282,16 +276,16 @@ const updateWindowSiz = _ => {
             x: -8, y: -8, w: C_ARW_WIDTH + 16, h: C_ARW_WIDTH + 16,
         },
         lblCredit: {
-            x: 125, y: g_sHeight - 30, w: g_headerObj.playingWidth - 125, h: 20, align: C_ALIGN_LEFT,
+            x: 135, y: g_sHeight - 30, w: g_headerObj.playingWidth - 125, h: 20, align: C_ALIGN_LEFT,
         },
         lblDifName: {
-            x: 125, y: g_sHeight - 16, w: g_headerObj.playingWidth, h: 20, align: C_ALIGN_LEFT,
+            x: 135, y: g_sHeight - 16, w: g_headerObj.playingWidth, h: 20, align: C_ALIGN_LEFT,
         },
         lblTime1: {
             x: 18, y: g_sHeight - 30, w: 40, h: 20, siz: C_SIZ_MAIN, align: C_ALIGN_RIGHT,
         },
         lblTime2: {
-            x: 60, y: g_sHeight - 30, w: 60, h: 20, siz: C_SIZ_MAIN,
+            x: 68, y: g_sHeight - 30, w: 60, h: 20, siz: C_SIZ_MAIN,
         },
         lblWord: {
             x: 100, w: g_headerObj.playingWidth - 200, h: 50,
@@ -347,7 +341,7 @@ const g_windowAlign = {
         $id(`canvas-frame`).marginLeft = `auto`;
         $id(`canvas-frame`).marginRight = `0px`;
     },
-}
+};
 
 const g_imgObj = {};
 
@@ -428,7 +422,7 @@ const resetImgs = (_baseDir = ``, _exp = `svg`) => {
     if (g_presetObj.customImageList !== undefined) {
         g_presetObj.customImageList.forEach(image => reloadImgCustomObj(image, _baseDir, _exp));
     }
-}
+};
 
 const reloadImgObj = _ => {
     g_imgObj.arrow = C_IMG_ARROW;
@@ -624,9 +618,9 @@ let g_allFrz = 0;
 let g_fullArrows = 0;
 let g_currentArrows = 0;
 const g_rankObj = {
-    rankMarks: [`SS`, `S`, `SA`, `AAA`, `AA`, `A`, `B`, `C`],
-    rankRate: [97, 90, 85, 80, 75, 70, 50, 0],
-    rankColor: [`#00ccff`, `#6600ff`, `#ff9900`, `#ff0000`, `#00ff00`, `#ff00ff`, `#cc00ff`, `#cc9933`],
+    rankMarks: [`SS`, `S`, `SA`, `AAA`, `AA`, `A`, `B`, `C`, `D`],
+    rankRate: [97, 90, 85, 80, 75, 70, 65, 60, 0],
+    rankColor: [`#00ccff`, `#6600ff`, `#ff9900`, `#ff0000`, `#00ff00`, `#ff00ff`, `#cc00ff`, `#cc9933`, `#33cc99`],
 
     rankMarkAllPerfect: `AP`,
     rankColorAllPerfect: ``,
@@ -648,7 +642,7 @@ const g_pointAllocation = {
     sfsf: 4,
     maxCombo: 2,
     fmaxCombo: 2,
-}
+};
 
 let C_WOD_FRAME = 30;
 
@@ -699,6 +693,7 @@ const g_stateObj = {
     appearance: `Visible`,
     filterLock: C_FLG_OFF,
     opacity: 100,
+	
 	errorbar: C_FLG_OFF,
 	ratioType: C_FLG_OFF,
 
@@ -752,8 +747,9 @@ let g_appearanceRanges = [`Hidden+`, `Sudden+`, `Hid&Sud+`];
 const g_settings = {
     speeds: [...Array((C_MAX_SPEED - C_MIN_SPEED) * 20 + 1).keys()].map(i => C_MIN_SPEED + i / 20),
     speedNum: 0,
+    speedTerms: [20, 5, 1],
 
-    motions: [C_FLG_OFF, `Boost`, `Brake`],
+    motions: [C_FLG_OFF, `Boost`, `Hi-Boost`, `Brake`],
     motionNum: 0,
 
     reverses: [C_FLG_OFF, C_FLG_ON],
@@ -773,6 +769,7 @@ const g_settings = {
 
     adjustments: [...Array(C_MAX_ADJUSTMENT * 20 + 1).keys()].map(i => (i - C_MAX_ADJUSTMENT * 10) / 10),
     adjustmentNum: C_MAX_ADJUSTMENT * 10,
+    adjustmentTerms: [50, 10, 5],
 
     volumes: [0, 0.5, 1, 2, 5, 10, 25, 50, 75, 100],
 
@@ -791,11 +788,13 @@ const g_settings = {
 	ratioTypeNum: 0,
 
     scoreDetails: [`Speed`, `Density`, `ToolDif`],
-    scoreDetailNum: 0,
+    scoreDetailCursors: [],
 };
 
 g_settings.volumeNum = g_settings.volumes.length - 1;
 g_settings.opacityNum = g_settings.opacitys.length - 1;
+g_settings.scoreDetailCursors = g_settings.scoreDetails.map(val => `lnk${val}G`);
+g_settings.scoreDetailCursors.push(`btnGraph`);
 
 /**
  * 設定画面間移動
@@ -825,25 +824,48 @@ const g_shuffleFunc = {
     },
 };
 
+/**
+ * モーション適用関数
+ * - frmsはフレーム別の速度設定用配列。
+ * - 配列の15がステップゾーン上、0～14は矢印の枠外管理用
+ */
+const g_motionFunc = {
+    'OFF': _frms => _frms,
+    'Boost': _frms => getBoostTrace(_frms, 3),
+    'Hi-Boost': _frms => getBoostTrace(_frms, g_stateObj.speed * 2),
+    'Brake': _frms => getBrakeTrace(_frms),
+};
+
 const g_keycons = {
     configTypes: [`Main`, `Replaced`, `ALL`],
     configTypeNum: 0,
 
     colorTypes: [`Default`, `Type0`, `Type1`, `Type2`, `Type3`, `Type4`],
-    colorDefs: [C_FLG_ON, C_FLG_ON, C_FLG_OFF, C_FLG_OFF, C_FLG_OFF, C_FLG_OFF],
+    colorDefTypes: [`Default`, `Type0`],
     colorTypeNum: 0,
+    colorSelf: `TypeS`,
 
     imgTypes: [],
     imgTypeNum: 0,
 
+    colorGroups: [0],
     colorGroupNum: 0,
+
+    shuffleGroups: [0],
     shuffleGroupNum: 0,
+    groupSelf: `S`,
+
+    groups: [`color`, `shuffle`],
 };
 
 let g_displays = [`stepZone`, `judgment`, `fastSlow`, `lifeGauge`, `score`, `musicInfo`, `filterLine`,
     `speed`, `color`, `lyrics`, `background`, `arrowEffect`, `special`];
 
-let g_storeSettings = [`appearance`, `opacity`, `errorbar`, `ratioType`, `d_stepzone`, `d_judgment`, `d_fastslow`, `d_lifegauge`,
+// ローカルストレージ保存対象
+let g_storeSettings = [`appearance`, `opacity`, `errorbar`, `ratioType`];
+
+// 廃棄対象のリスト(過去の登録対象をリスト化。ここに乗せるとローカルストレージから自動消去される)
+let g_storeSettingsEx = [`d_stepzone`, `d_judgment`, `d_fastslow`, `d_lifegauge`,
     `d_score`, `d_musicinfo`, `d_filterline`];
 
 let g_canDisabledSettings = [`motion`, `scroll`, `shuffle`, `autoPlay`, `gauge`, `appearance`];
@@ -891,7 +913,7 @@ const g_posObj = {
     stepYR: 0,
     stepDiffY: 0,
     arrowHeight: 0,
-}
+};
 
 const g_diffObj = {
     arrowJdgY: 0,
@@ -1200,8 +1222,13 @@ const g_shortcutObj = {
         KeyV: { id: `lnkVolumeR` },
 
         KeyI: { id: `btnGraph` },
-        ShiftLeft_KeyQ: { id: `lnkScoreDetailB` },
-        KeyQ: { id: `lnkScoreDetail` },
+        Digit1: { id: `lnkSpeedG` },
+        Digit2: { id: `lnkDensityG` },
+        Digit3: { id: `lnkToolDifG` },
+        Numpad1: { id: `lnkSpeedG` },
+        Numpad2: { id: `lnkDensityG` },
+        Numpad3: { id: `lnkToolDifG` },
+        KeyQ: { id: `lnkSpeedG` },
         KeyP: { id: `lnkDifInfo` },
         KeyZ: { id: `btnSave` },
 
@@ -1219,6 +1246,16 @@ const g_shortcutObj = {
         KeyL: { id: `lnkDifficulty` },
         ArrowDown: { id: `btnDifD` },
         ArrowUp: { id: `btnDifU` },
+
+        KeyI: { id: `btnGraph` },
+        Digit1: { id: `lnkSpeedG` },
+        Digit2: { id: `lnkDensityG` },
+        Digit3: { id: `lnkToolDifG` },
+        Numpad1: { id: `lnkSpeedG` },
+        Numpad2: { id: `lnkDensityG` },
+        Numpad3: { id: `lnkToolDifG` },
+        KeyQ: { id: `lnkSpeedG` },
+        KeyP: { id: `lnkDifInfo` },
 
         Escape: { id: `btnBack` },
         Space: { id: `btnKeyConfig` },
@@ -1424,6 +1461,7 @@ const g_keyObj = {
     currentPtn: 0,
 
     prevKey: `Dummy`,
+    dfPtnNum: 0,
 
     // キー別ヘッダー
     // - 譜面データ中に出てくる矢印(ノーツ)の種類と順番(ステップゾーン表示順)を管理する。
@@ -2053,7 +2091,7 @@ const g_keyObj = {
     // 矢印群の倍率指定
     scale: 1,
     scale_def: 1,
-    scale17_0: 0.85,
+    scale17_0: 0.95,
 
     // ショートカットキーコード
     keyRetry: 8,
@@ -2543,7 +2581,7 @@ const g_keyObj = {
     minWidth11i: 650,
     minWidth13: 650,
     minWidth16i: 650,
-    minWidth17: 800,
+    minWidth17: 825,
     minWidth23: 900,
 
 };
@@ -2552,7 +2590,7 @@ const g_keyObj = {
 const keyCtrlName = Object.keys(g_keyObj).filter(val => val.startsWith(`keyCtrl`));
 keyCtrlName.forEach(property => g_keyObj[`${property}d`] = copyArray2d(g_keyObj[property]));
 
-[`color`, `shuffle`].forEach(type => {
+g_keycons.groups.forEach(type => {
     const tmpName = Object.keys(g_keyObj).filter(val => val.startsWith(type) && val.endsWith(`_0`));
     tmpName.forEach(property => g_keyObj[`${property.slice(0, -2)}`] = g_keyObj[property].concat());
 });
@@ -2860,7 +2898,7 @@ const g_lang_msgInfoObj = {
         I_0003: `Charts information is copied to the clipboard!`,
         I_0004: `Play in silence mode because "musicUrl" is not set`,
     },
-}
+};
 
 /**
  * ショートカット表示のデフォルト値設定
@@ -2925,7 +2963,7 @@ const g_lblNameObj = {
     filterLock: `Lock`,
 
     sc_speed: `←→`,
-    sc_scroll: `R/↑↓`,
+    sc_scroll: `R/<br>↑↓`,
     sc_adjustment: `- +`,
     sc_keyConfigPlay: g_isMac ? `Del+Enter` : `BS+Enter`,
 
@@ -2968,6 +3006,7 @@ const g_lblNameObj = {
     'u_OFF': `OFF`,
     'u_ON': `ON`,
     'u_Boost': `Boost`,
+    'u_Hi-Boost': `Hi-Boost`,
     'u_Brake': `Brake`,
 
     'u_Cross': `Cross`,
@@ -3070,7 +3109,8 @@ const g_lblNameObj = {
 const g_lang_lblNameObj = {
     Ja: {
         kcDesc: `[{0}:スキップ / {1}:(代替キーのみ)キー無効化]`,
-        kcShuffleDesc: `番号をクリックでシャッフルグループ、矢印をクリックでカラーグループを一時的に変更`,
+        kcShuffleDesc: `番号をクリックでシャッフルグループ、矢印をクリックでカラーグループを変更`,
+        kcNoShuffleDesc: `矢印をクリックでカラーグループを変更`,
         sdDesc: `[クリックでON/OFFを切替、灰色でOFF]`,
         kcShortcutDesc: `プレイ中ショートカット：「{0}」タイトルバック / 「{1}」リトライ`,
         transKeyDesc: `別キーモードではハイスコア、キーコンフィグ等は保存されません`,
@@ -3084,11 +3124,9 @@ const g_lang_lblNameObj = {
         s_print: `データ出力`,
         s_printTitle: `Dancing☆Onigiri レベル計算ツール+++`,
         s_printHeader: `難易度\t同時\t縦連\t総数\t矢印\t氷矢印\tAPM\t時間`,
-
 		
 		j_bar: `|`,
-		
-		
+
         j_ii: "(・∀・)ｲｲ!!",
         j_shakin: "(`・ω・)ｼｬｷﾝ",
         j_matari: "( ´∀`)ﾏﾀｰﾘ",
@@ -3099,10 +3137,14 @@ const g_lang_lblNameObj = {
         j_iknai: "(・A・)ｲｸﾅｲ",
 
         j_adj: `推定Adj`,
+
+        helpUrl: `https://github.com/cwtickle/danoniplus/wiki/AboutGameSystem`,
+        securityUrl: `https://github.com/cwtickle/danoniplus/security/policy`,
     },
     En: {
         kcDesc: `[{0}:Skip / {1}:Key invalidation (Alternate keys only)]`,
         kcShuffleDesc: `Click the number to change the shuffle group, and click the arrow to change the color.`,
+        kcNoShuffleDesc: `Click the arrow to change the color group.`,
         sdDesc: `[Click to switch, gray to OFF]`,
         kcShortcutDesc: `Shortcut during play: "{0}" Return to title / "{1}" Retry the game`,
         transKeyDesc: `High score, key config, etc. are not saved in another key mode`,
@@ -3116,11 +3158,9 @@ const g_lang_lblNameObj = {
         s_print: `CopyData`,
         s_printTitle: `Dancing☆Onigiri Level Calculator+++`,
         s_printHeader: `Level\tN-Push\tJack\tAll\tArrow\tFrz\tAPM\tTime`,
-
 		
 		j_bar: `|`,
-		
-		
+
         j_ii: ":D Perfect!!",
         j_shakin: ":) Great!",
         j_matari: ":| Good",
@@ -3131,6 +3171,9 @@ const g_lang_lblNameObj = {
         j_iknai: ":( N.G.",
 
         j_adj: `Est-Adj.`,
+
+        helpUrl: `https://github.com/cwtickle/danoniplus-docs/wiki/AboutGameSystem`,
+        securityUrl: `https://github.com/cwtickle/danoniplus-docs/wiki/SecurityPolicy`,
     },
 };
 
@@ -3197,6 +3240,9 @@ const g_lang_msgObj = {
         imgType: `矢印・フリーズアローなどのオブジェクトの見た目を変更します。`,
         colorGroup: `矢印・フリーズアロー色グループの割り当てパターンを変更します。`,
         shuffleGroup: `Mirror/Asym-Mirror/Random/S-Random選択時、シャッフルするグループを変更します。\n矢印の上にある同じ数字同士でシャッフルします。`,
+
+        pickArrow: `色番号ごとの矢印色（枠、塗りつぶし）、通常時のフリーズアロー色（枠、帯）を\nカラーピッカーから選んで変更できます。`,
+        pickColorCopy: `このボタンを押すと、フリーズアローの配色を矢印（枠）の色で上書きします。\nヒット時のフリーズアローの色も上書きします。`,
     },
 
     En: {
@@ -3250,6 +3296,9 @@ const g_lang_msgObj = {
         imgType: `Change the appearance of sequences.`,
         colorGroup: `Change the sequences color group assignment pattern.`,
         shuffleGroup: `Change the shuffle group when Mirror, Asym-Mirror, Random or S-Random are selected.\nShuffle with the same numbers listed above.`,
+
+        pickArrow: `Change the frame or fill of arrow color and the frame or bar of normal freeze-arrow color\nfor each color number from the color picker.`,
+        pickColorCopy: `Pressing this button will override the color scheme of the freeze arrow with the frame color of the arrow. \nIt also overrides the color of the freeze arrow on hit.`,
     },
 
 };
@@ -3601,4 +3650,4 @@ const loadLegacySettingFunc = _ => {
     if (typeof g_presetKeysData === C_TYP_STRING) {
         g_presetObj.keysData = g_presetKeysData;
     }
-}
+};
