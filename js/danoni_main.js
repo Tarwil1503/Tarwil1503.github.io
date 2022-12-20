@@ -9618,18 +9618,19 @@ const judgeArrow = _j => {
 			} else {
 				displayDiff(_difFrame, `F`);
 			}
-
+			if (g_attrObj[frzName].keyUpFrame === 0 && g_attrObj[frzName].isMoving) {
+				g_workObj.diffListR.push(_difCnt);
+				createErrorbar(_difFrame, true);
+				lblRatio.textContent = calculateRatio();
+			}
+			
 			if (_difCnt <= g_judgObj.frzJ[g_judgPosObj.sfsf]) {
 				changeHitFrz(_j, fcurrentNo, `frz`);
 			} else {
 				changeFailedFrz(_j, fcurrentNo);
 			}
 			g_workObj.judgFrzHitCnt[_j] = fcurrentNo + 1;
-			if (g_attrObj[frzName].keyUpFrame === 0 && g_attrObj[frzName].isMoving) {
-				g_workObj.diffListR.push(_difCnt);
-				createErrorbar(_difFrame);
-				lblRatio.textContent = calculateRatio();
-			}
+
 			return true;
 		}
 		return false;
@@ -9656,6 +9657,8 @@ const judgeArrow = _j => {
  */
 const displayDiff = (_difFrame, _fjdg = ``, _justFrames = g_headerObj.justFrames) => {
 	let diffJDisp = ``;
+	lblEstAdj.style.left = `${g_headerObj.playingWidth / 2 - 5 * calculateEstAdj()}px`;
+	lblEstAdj.style.zIndex = 100;
 	g_workObj.diffList.push(_difFrame);
 	const difCnt = Math.abs(_difFrame);
 	if (_difFrame > _justFrames) {
@@ -9842,18 +9845,24 @@ const checkJudgment = (_difCnt) => {
 
 const checkErrorbar = [];
 //ErrorBarの生成
-function createErrorbar (_difFrame) {
+function createErrorbar (_difFrame, checkFrz = false) {
 	const _difCnt = Math.abs(_difFrame);
 	let jdgColor;
+	let frzDepth;
 	if (_difCnt <= 8) {
-		jdgColor = checkJudgment(_difCnt)[1].toLowerCase();
+		if (checkFrz) {
+			jdgColor = `kita`;
+			frzDepth = 1;
+		} else {
+			jdgColor = checkJudgment(_difCnt)[1].toLowerCase();
+		}
 	} else {
 		jdgColor = `uwan`;
 	}
 	if (g_stateObj.errorbar === `Type1`) {
 		infoSprite.appendChild(createDivCss2Label(`bar_${g_barNo}`, g_lblNameObj.j_bar, {
 			x: g_headerObj.playingWidth / 2 - 5 * _difFrame, y: (g_sHeight + g_posObj.stepYR) / 2 - 80,
-				w: 0, h: 20, siz: C_SIZ_MAIN,
+				w: 0, h: 20, siz: C_SIZ_MAIN, zIndex: frzDepth,
 				animationDuration: `1.5s`,
 				animationName: `fadeOut0`,
 				opacity: 0,
@@ -9869,7 +9878,7 @@ function createErrorbar (_difFrame) {
 		}
 		infoSprite.appendChild(createDivCss2Label(`bar`, g_lblNameObj.j_bar, {
 			x: g_headerObj.playingWidth / 2 - 5 * _difFrame, y: (g_sHeight + g_posObj.stepYR) / 2 - 80,
-				w: 0, h: 20, siz: C_SIZ_MAIN,
+				w: 0, h: 20, siz: C_SIZ_MAIN, zIndex: frzDepth,
 			}, g_cssObj[`common_${jdgColor}`])
 		);			
 	}
@@ -10258,7 +10267,7 @@ const resultInit = _ => {
 		);
 		if (estimatedAdj !== ``) {
 			multiAppend(resultWindow,
-				makeCssResultSymbol(`lblAdj`, 420, g_cssObj.common_shakin, 4, g_lblNameObj.j_adj),
+				makeCssResultSymbol(`lblAdj`, 420, g_cssObj.common_kita, 4, g_lblNameObj.j_adj),
 				makeCssResultSymbol(`lblAdjS`, 330, g_cssObj.score, 5, `${getDiffFrame(estimatedAdj)}`, C_ALIGN_RIGHT),
 			);
 		}
