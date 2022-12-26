@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 /**
  * Dancing☆Onigiri 設定用jsファイル
  * Template Update: 2022/03/25 (v27.1.0)
@@ -363,7 +363,8 @@ g_presetObj.lblRenames = {
  */
 g_presetObj.keysData = `
 
-|keyExtraList=9j,9A,9B,12,12i,12F|
+|keyExtraList=8,9j,9A,9B,12,12i,12F|
+|assist8=R-Onigiri::0,0,0,0,0,0,0,1|
 |color9j=2,0,1,0,2,0,1,0,2$0,0,0,0,2,3,3,3,3$0,0,0,0,2,3,3,3,3$1,0,1,0,2,0,1,0,1|
 |chara9j=left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright$left,down,up,right,space,sleft,sdown,sup,sright|
 |pos9j=0,1,2,3,4,5,6,7,8,9,10$0,1,2,3,4,5,6,7,8,9,10$0,1,2,3,4,5,6,7,8$0,1,2,3,4,5,6,7,8,9,10|
