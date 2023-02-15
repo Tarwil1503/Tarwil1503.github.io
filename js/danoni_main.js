@@ -8844,6 +8844,9 @@ const mainInit = _ => {
 
 					// 自身より前の矢印が未判定の場合、強制的に枠外判定を行い矢印を削除
 					if (prevArrow.cnt >= (-1) * g_judgObj.arrowJ[g_judgPosObj.uwan]) {
+						g_workObj.diffListR.push(9);
+						createErrorbar(-10);
+						lblRatio.textContent = calculateRatio();
 						judgeUwan(prevArrow.cnt);
 						judgeObjDelete.arrow(_j, prevArrowName);
 					}
@@ -8865,6 +8868,9 @@ const mainInit = _ => {
 
 					// 自身より前のフリーズアローが未判定の場合、強制的に枠外判定を行いフリーズアローを削除
 					if (prevFrz.cnt >= (-1) * g_judgObj.frzJ[g_judgPosObj.iknai]) {
+						g_workObj.diffListR.push(9);
+						createErrorbar(-10);
+						lblRatio.textContent = calculateRatio();
 						judgeIknai(prevFrz.cnt);
 						if (g_headerObj.frzStartjdgUse) {
 							judgeUwan(prevFrz.cnt);
