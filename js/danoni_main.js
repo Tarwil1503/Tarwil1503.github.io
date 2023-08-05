@@ -1,16 +1,15 @@
-'use strict';
+﻿'use strict';
 /**
  * Dancing☆Onigiri (CW Edition)
  * 
  * Source by tickle
  * Created : 2018/10/08
- * Revised : 2022/12/09
+ * Revised : 2023/08/04
  * 
  * https://github.com/cwtickle/danoniplus
  */
-const g_version = `Ver 29.3.1`;
-const g_revisedDate = `2022/12/09`;
-const g_alphaVersion = ``;
+const g_version = `Ver 33.1.1`;
+const g_revisedDate = `2023/08/04`;
 
 // カスタム用バージョン (danoni_custom.js 等で指定可)
 let g_localVersion = ``;
@@ -48,8 +47,11 @@ const current = _ => {
 	return targetScript.src;
 };
 const g_rootPath = current().match(/(^.*\/)/)[0];
+const g_workPath = new URL(location.href).href.match(/(^.*\/)/)[0];
 const g_remoteFlg = g_rootPath.match(`^https://cwtickle.github.io/danoniplus/`) !== null;
 const g_randTime = Date.now();
+const g_isFile = location.href.match(/^file/);
+const g_isLocal = location.href.match(/^file/) || location.href.indexOf(`localhost`) !== -1;
 
 window.onload = async () => {
 	g_loadObj.main = true;
@@ -115,10 +117,16 @@ let g_finishFlg = true;
 /** 共通オブジェクト */
 const g_loadObj = {};
 const g_rootObj = {};
-const g_presetObj = {};
+const g_presetObj = {
+	keysDataLib: [],
+};
 let g_headerObj = {};
 let g_scoreObj = {};
 let g_attrObj = {};
+
+const g_btnFunc = {
+	base: {}, reset: {}, cxt: {},
+};
 let g_btnAddFunc = {};
 let g_btnDeleteFlg = {};
 let g_cxtAddFunc = {};
@@ -162,14 +170,13 @@ let g_wordSprite;
 let g_barNo;
 let g_deleteNo;
 
-
 const g_wordObj = {
 	wordDir: 0,
 	wordDat: ``,
 	fadeInFlg0: false,
 	fadeInFlg1: false,
 	fadeOutFlg0: false,
-	fadeOutFlg1: false
+	fadeOutFlg1: false,
 };
 
 // オーディオ設定・タイマー管理
@@ -228,6 +235,19 @@ const setAttrs = (_baseObj, { ...rest } = {}) =>
  */
 const getNumAttr = (_baseObj, _attrkey) => parseFloat(_baseObj.getAttribute(_attrkey));
 
+/**
+ * 文字列に埋め込まれた変数を展開
+ * @param {string} _str 
+ */
+const convertStrToVal = _str => {
+	const strs = _str.split(`}`).join(`{`).split(`{`);
+	let convStrs = ``;
+	for (let j = 0; j < strs.length; j += 2) {
+		convStrs += escapeHtmlForEnabledTag(strs[j]);
+		convStrs += setVal(strs[j + 1], ``, C_TYP_CALC);
+	}
+	return convStrs;
+};
 
 /*-----------------------------------------------------------*/
 /* 値や配列のチェック・変換                                    */
@@ -240,6 +260,31 @@ const getNumAttr = (_baseObj, _attrkey) => parseFloat(_baseObj.getAttribute(_att
 const hasVal = _data => _data !== undefined && _data !== ``;
 
 /**
+ * 変数が存在するかどうかをチェック(null無しを含む)
+ * @param {string} _data
+ */
+const hasValN = _data => hasVal(_data) && _data !== null;
+
+/**
+ * 文字列から他の型へ変換する処理群
+ */
+const g_convFunc = {
+	float: (_checkStr, _default) => isNaN(parseFloat(_checkStr)) ? _default : parseFloat(_checkStr),
+	number: (_checkStr, _default) => isNaN(parseInt(_checkStr)) ? _default : parseInt(_checkStr),
+	boolean: (_checkStr, _default) => _checkStr.toString().toLowerCase() === `true` ? true :
+		(_checkStr.toString().toLowerCase() === `false` ? false : _default),
+	switch: (_checkStr, _default) => [C_FLG_OFF, C_FLG_ON].includes(_checkStr.toString().toUpperCase()) ? _checkStr.toString().toUpperCase() : _default,
+	calc: (_checkStr, _default) => {
+		try {
+			return new Function(`return ${_checkStr}`)();
+		} catch (err) {
+			return _default;
+		}
+	},
+	string: (_checkStr) => _checkStr,
+};
+
+/**
  * 文字列を想定された型に変換
  * - _type は `float`(小数)、`number`(整数)、`boolean`(真偽値)、
  *   `switch`(ON/OFF), `calc`(数式), `string`(文字列)から選択
@@ -248,62 +293,22 @@ const hasVal = _data => _data !== undefined && _data !== ``;
  * @param {string} _default 
  * @param {string} _type 
  */
-const setVal = (_checkStr, _default, _type = C_TYP_STRING) => {
-
-	let convertStr = _checkStr;
-
-	// 値がundefined相当の場合は無条件でデフォルト値を返却
-	if (_checkStr === undefined || _checkStr === null || _checkStr === ``) {
-		return _default;
-	}
-
-	if (_type === C_TYP_FLOAT) {
-		// 数値型(小数可)の場合
-		const toFloat = parseFloat(_checkStr);
-		convertStr = (isNaN(toFloat) ? _default : toFloat);
-
-	} else if (_type === C_TYP_NUMBER) {
-		// 数値型(整数のみ)の場合
-		const toInt = parseInt(_checkStr);
-		convertStr = (isNaN(toInt) ? _default : toInt);
-
-	} else if (_type === C_TYP_BOOLEAN) {
-		// 真偽値の場合
-		const lowerCase = _checkStr.toString().toLowerCase();
-		convertStr = (lowerCase === `true` ? true : (lowerCase === `false` ? false : _default));
-
-	} else if (_type === C_TYP_SWITCH) {
-		// ON/OFFスイッチの場合
-		const toSwtich = _checkStr.toString().toUpperCase();
-		convertStr = [C_FLG_OFF, C_FLG_ON].includes(toSwtich) ? toSwtich : _default;
-
-	} else if (_type === C_TYP_CALC) {
-		try {
-			convertStr = new Function(`return ${_checkStr}`)();
-		} catch (err) {
-			convertStr = _default;
-		}
-	}
-
-	// 文字列型の場合 (最初でチェック済みのためそのまま値を返却)
-	return convertStr;
-};
+const setVal = (_checkStr, _default, _type = C_TYP_STRING) =>
+	hasValN(_checkStr) ? g_convFunc[_type](_checkStr, _default) : _default;
 
 /**
  * ブール値への変換
  * @param {string} _val 
- * @param {boolean} _defaultVal 
- * @returns 
+ * @param {boolean} _defaultVal
  */
-const setBoolVal = (_val, _defaultVal = false) => setVal(_val, _defaultVal, C_TYP_BOOLEAN);
+const setBoolVal = (_val, _defaultVal = false) => hasValN(_val) ? g_convFunc.boolean(_val, _defaultVal) : _defaultVal;
 
 /**
  * 整数値への変換
  * @param {string} _val 
- * @param {number} _defaultVal 
- * @returns 
+ * @param {number} _defaultVal
  */
-const setIntVal = (_val, _defaultVal = 0) => setVal(_val, _defaultVal, C_TYP_NUMBER);
+const setIntVal = (_val, _defaultVal = 0) => hasValN(_val) ? g_convFunc.number(_val, _defaultVal) : _defaultVal;
 
 /**
  * 先頭のみ大文字に変換（それ以降はそのまま）
@@ -322,11 +327,18 @@ const toCapitalize = _str => {
 const roundZero = (_num, _init = 0) => _num < 0 ? _init : _num;
 
 /**
+ * 配列から_targetに合致する配列位置を返す
+ * 存在しない場合は0を返却
+ * @param {array} _list 
+ * @param {string} _target
+ */
+const getCurrentNo = (_list, _target) => roundZero(_list.indexOf(_target));
+
+/**
  * 配列内に存在するかどうかをチェック
  * @param {string} _val 
  * @param {array} _array 
- * @param {integer} _pos 
- * @returns 
+ * @param {integer} _pos
  */
 const hasValInArray = (_val, _array, _pos = 0) =>
 	_array.findIndex(data => data[_pos] === _val) !== -1;
@@ -334,49 +346,97 @@ const hasValInArray = (_val, _array, _pos = 0) =>
 /**
  * 配列が既定長以上かどうかをチェック
  * @param {array} _data 
- * @param {integer} _length 
- * @returns 
+ * @param {integer} _length
  */
 const hasArrayList = (_data, _length = 1) => _data !== undefined && _data.length >= _length;
 
 /**
  * 改行コード区切りの配列展開
- * @param {string} _str 
- * @returns 
+ * @param {string} _str
  */
-const splitLF = _str => _str.split(`\r`).join(`\n`).split(`\n`);
+const splitLF = _str => _str?.split(`\r`).join(`\n`).split(`\n`);
 
 /**
  * 改行コード区切りを本来の区切り文字に変換して配列展開
  * （改行区切りで間が空行だった場合は無効化）
  * @param {string} _str 
- * @param {string} _delim 
- * @returns 
+ * @param {string} _delim
  */
-const splitLF2 = (_str, _delim = `$`) => splitLF(_str).filter(val => val !== ``).join(_delim).split(_delim);
+const splitLF2 = (_str, _delim = `$`) => splitLF(_str)?.filter(val => val !== ``).join(_delim).split(_delim);
 
 /**
  * 重複を排除した配列の生成
  * @param {array} _array1 
- * @param {...any} _arrays 
- * @returns 
+ * @param {...any} _arrays
  */
 const makeDedupliArray = (_array1, ..._arrays) =>
-	Array.from((new Set([..._array1, ..._arrays.flat()])).values());
+	Array.from((new Set([..._array1, ..._arrays.flat()])).values()).filter(val => val !== undefined);
 
 /**
  * 二次元配列のコピー
- * @param {array2} _array2d 
- * @returns 
+ * @param {array2} _array2d
  */
 const copyArray2d = _array2d => structuredClone(_array2d);
 
 /**
  * 配列データを合計
- * @param {array} _array 
- * @returns 
+ * @param {array} _array
  */
 const sumData = _array => _array.reduce((p, x) => p + x);
+
+/**
+ * 最小配列長の配列を作成
+ * @param {array} _array 
+ * @param {number} _minLength 
+ * @param {number} _defaultVal
+ */
+const makeBaseArray = (_array = [], _minLength, _defaultVal) => padArray(_array, [...Array(_minLength)].fill(_defaultVal));
+
+/**
+ * ベースとする配列に対して別の配列で上書き
+ * @param {array} _array 
+ * @param {array} _baseArray ベースとする配列
+ */
+const padArray = (_array, _baseArray) => {
+	_array?.forEach((val, j) => {
+		if (hasVal(val)) {
+			_baseArray[j] = val;
+		}
+	});
+	return _baseArray;
+};
+
+/**
+ * 配列から上位N番目までに一致する位置を取得
+ * 
+ * ex. 上位3番目 (_num = 3) の場合
+ *     [1, 3, 2, 4, 6, 4, 5] -> [[4], [6], [3, 5]]
+ *     [9, 6, 9, 9, 8, 7, 5] -> [[0, 2, 3]]
+ * @param {array} _array 
+ * @param {number} _num
+ */
+const getMaxValIdxs = (_array, _num = 1) => {
+	const getMaxVal = (_a, _b) => Math.max(_a, _b);
+	let baseArray = _array.concat();
+	const maxIdxs = [];
+
+	for (let j = 0; j < _num; j++) {
+		maxIdxs[j] = [];
+		const maxVal = baseArray.reduce((a, b) => getMaxVal(a, b));
+		_array.map((val, idx) => {
+			if (val === maxVal) {
+				maxIdxs[j].push(idx);
+			}
+		});
+		baseArray = baseArray.filter(val => val < maxVal);
+
+		// 同率で上位N番目まで取得した場合は途中で終了
+		if (baseArray.length === 0 || maxIdxs.flat().length >= _num) {
+			break;
+		}
+	}
+	return maxIdxs;
+};
 
 /**
  * 部分一致検索（リストのいずれかに合致、大小文字問わず）
@@ -398,9 +458,7 @@ const fuzzyListMatching = (_str, _headerList, _footerList) =>
  */
 const replaceStr = (_str, _pairs) => {
 	let tmpStr = _str;
-	_pairs.forEach(pair => {
-		tmpStr = tmpStr.replaceAll(pair[0], pair[1]);
-	});
+	_pairs.forEach(pair => tmpStr = tmpStr.replaceAll(pair[0], pair[1]));
 	return tmpStr;
 };
 
@@ -433,8 +491,7 @@ const escapeHtmlForArray = _array => _array.map(str => escapeHtml(str));
  * 次のカーソルへ移動
  * @param {number} _basePos 
  * @param {number} _num 
- * @param {number} _length 
- * @returns 
+ * @param {number} _length
  */
 const nextPos = (_basePos, _num, _length) => (_basePos + _length + _num) % _length;
 
@@ -457,7 +514,7 @@ const transCode = _setCode => {
  * 特定キーをブロックする処理
  * @param {string} _setCode 
  */
-const blockCode = _setCode => !C_BLOCK_KEYS.map(key => g_kCdN[key]).includes(_setCode);
+const blockCode = _setCode => !C_BLOCK_KEYS.includes(_setCode);
 
 
 /*-----------------------------------------------------------*/
@@ -475,7 +532,7 @@ const commonKeyDown = (_evt, _displayName, _func = _code => { }, _dfEvtFlg) => {
 	if (!_dfEvtFlg) {
 		_evt.preventDefault();
 	}
-	const setCode = transCode(_evt.code);
+	const setCode = _evt.code;
 	if (_evt.repeat && (g_unrepeatObj.page.includes(_displayName) || g_unrepeatObj.key.includes(setCode))) {
 		return blockCode(setCode);
 	}
@@ -508,8 +565,9 @@ const commonKeyDown = (_evt, _displayName, _func = _code => { }, _dfEvtFlg) => {
  * @param {object} _evt 
  */
 const commonKeyUp = _evt => {
-	g_inputKeyBuffer[g_kCdNameObj.metaKey] = false;
-	g_inputKeyBuffer[transCode(_evt.code)] = false;
+	g_inputKeyBuffer[g_kCdNameObj.metaLKey] = false;
+	g_inputKeyBuffer[g_kCdNameObj.metaRKey] = false;
+	g_inputKeyBuffer[_evt.code] = false;
 };
 
 /**
@@ -535,7 +593,7 @@ const createScText = (_obj, _settingLabel, { displayName = `option`, dfLabel = `
  * 各画面の汎用ショートカットキー表示
  * @param {string} _displayName 
  */
-const createScTextCommon = _displayName => {
+const createScTextCommon = _displayName =>
 	Object.keys(g_btnPatterns[_displayName]).filter(target => document.getElementById(`btn${target}`) !== null)
 		.forEach(target =>
 			createScText(document.getElementById(`btn${target}`), target, {
@@ -543,7 +601,6 @@ const createScTextCommon = _displayName => {
 				dfLabel: g_lblNameObj[`sc_${_displayName}${target}`] ?? ``,
 				x: g_btnPatterns[_displayName][target],
 			}));
-};
 
 /**
  * ショートカットキー有効化
@@ -582,6 +639,16 @@ const openLink = _url => {
 	if (_url.match(`^(http|https):/`)) {
 		window.open(_url, `_blank`, `noopener`);
 	}
+};
+
+/**
+ * URLのフルパスを取得
+ * @param {string} _url
+ */
+const getFullPath = _url => {
+	const link = document.createElement(`a`);
+	link.href = _url;
+	return link.href;
 };
 
 /**
@@ -649,7 +716,7 @@ const loadScript2 = (_url, _requiredFlg = true, _charset = `UTF-8`) => {
 		};
 		script.onerror = _err => {
 			if (_requiredFlg) {
-				makeWarningWindow(g_msgInfoObj.E_0041.split(`{0}`).join(_url.split(`?`)[0]));
+				makeWarningWindow(g_msgInfoObj.E_0041.split(`{0}`).join(getFullPath(baseUrl)));
 				reject(_err);
 			} else {
 				resolve(script);
@@ -664,7 +731,7 @@ const loadScript2 = (_url, _requiredFlg = true, _charset = `UTF-8`) => {
  * デフォルトは danoni_skin_default.css を読み込む
  * @param {url} _href 
  */
-const importCssFile2 = _href => {
+const importCssFile2 = (_href, { crossOrigin = `anonymous` } = {}) => {
 	const baseUrl = _href.split(`?`)[0];
 	g_loadObj[baseUrl] = false;
 
@@ -672,12 +739,15 @@ const importCssFile2 = _href => {
 		const link = document.createElement(`link`);
 		link.rel = `stylesheet`;
 		link.href = _href;
+		if (!g_isFile) {
+			link.crossOrigin = crossOrigin;
+		}
 		link.onload = _ => {
 			g_loadObj[baseUrl] = true;
 			resolve(link);
 		};
 		link.onerror = _ => {
-			makeWarningWindow(g_msgInfoObj.E_0041.split(`{0}`).join(baseUrl), { resetFlg: `title` });
+			makeWarningWindow(g_msgInfoObj.E_0041.split(`{0}`).join(getFullPath(baseUrl)), { resetFlg: `title` });
 			resolve(link);
 		};
 		document.head.appendChild(link);
@@ -707,31 +777,65 @@ const loadMultipleFiles2 = async (_fileData, _loadType) => {
 };
 
 /**
- * 入力されたパスを、ディレクトリとそれ以外に分割
+ * 与えられたパスより、キーワードとディレクトリに分割
  * 返却値：[ファイルキーワード, ルートディレクトリ]
- * @param {string} _path 
- * @param {number} _pos 
- * @param {string} _directory 
+ * @param {string} _fileName 
+ * @param {string} _directory
  */
-const getFolderAndType = (_path, _pos, _directory = ``) => {
-	const rootPath = (_directory === `` ? `` : g_rootPath);
-	return (_pos > 0 ? [_path.substring(_pos + 1), `${rootPath}${_path.substring(0, _pos)}/`] : [_path, `${rootPath}${_directory}`]);
+const getFilePath = (_fileName, _directory = ``) => {
+	let fullPath;
+	if (_fileName.startsWith(C_MRK_CURRENT_DIRECTORY)) {
+		fullPath = `${g_workPath}${_fileName.slice(C_MRK_CURRENT_DIRECTORY.length)}`;
+	} else {
+		fullPath = `${g_rootPath}${_directory}${_fileName}`;
+	}
+	const dirPos = fullPath.lastIndexOf(`/`);
+	return [fullPath.slice(dirPos + 1), fullPath.slice(0, dirPos + 1)];
+}
+
+/**
+ * 画像ファイルの存在チェック後、プリロードする処理
+ * @param {string} _imgPath 
+ * @param {string} directory
+ * @param {boolean} syncBackPath 
+ * @returns 
+ */
+const preloadImgFile = (_imgPath, { directory = ``, syncBackPath = true } = {}) => {
+
+	let imgPath = _imgPath;
+	if (g_headerObj.autoPreload) {
+		if (checkImage(_imgPath)) {
+			if (syncBackPath) {
+				const [file, dir] = getFilePath(_imgPath, directory);
+				imgPath = `${dir}${file}`;
+			}
+			preloadFile(`image`, imgPath);
+		}
+	}
+	return imgPath;
 };
 
 /**
- * 与えられたパスより、キーワードとディレクトリに分割
- * カレントディレクトリ指定がある場合を考慮して、処理を分けている
- * 返却値：[ファイルキーワード, ルートディレクトリ]
- * @param {string} _fileName 
- * @param {string} _directory 
+ * 画像パス部分の取得
+ * @param {string} _str 
+ * @returns 
  */
-const getFilePath = (_fileName, _directory = ``) => {
-	if (_fileName.indexOf(C_MRK_CURRENT_DIRECTORY) !== -1) {
-		const tmpType = _fileName.split(C_MRK_CURRENT_DIRECTORY)[1];
-		return getFolderAndType(tmpType, tmpType.indexOf(`/`));
-	} else {
-		return getFolderAndType(_fileName, _fileName.lastIndexOf(`/`), _directory);
+const getImageUrlPath = _str => {
+	const matches = _str?.match(/url\("([^"]*)"\)/);
+	return matches && matches.length >= 2 ? matches[1] : ``;
+};
+
+/**
+ * カレントディレクトリを含む文字列を置換し、変更後の文字列を作成
+ * @param {string} _str  
+ */
+const reviseCssText = _str => {
+	if (getImageUrlPath(_str) !== ``) {
+		const imgOriginal = getImageUrlPath(_str);
+		const imgPath = preloadImgFile(imgOriginal);
+		return replaceStr(_str, [[imgOriginal, imgPath]]);
 	}
+	return _str;
 };
 
 /*-----------------------------------------------------------*/
@@ -740,8 +844,7 @@ const getFilePath = (_fileName, _directory = ``) => {
 
 /**
  * 対象のカラーコードが明暗どちらかを判定 (true: 明色, false: 暗色)
- * @param {string} _colorStr 
- * @returns 
+ * @param {string} _colorStr
  */
 const checkLightOrDark = _colorStr => {
 	const r = parseInt(_colorStr.substring(1, 3), 16);
@@ -768,15 +871,13 @@ const byteToHex = _num => (`${_num.toString(16).padStart(2, '0')}`);
 
 /**
  * カラーコードかどうかを判定 (簡易版)
- * @param {string} _str 
- * @returns 
+ * @param {string} _str
  */
 const isColorCd = _str => _str.substring(0, 1) === `#`;
 
 /**
  * CSSの位置表記系かどうかをチェック
- * @param {string} _str 
- * @returns 
+ * @param {string} _str
  */
 const hasAnglePointInfo = _str => fuzzyListMatching(_str, g_checkStr.cssHeader, g_checkStr.cssFooter);
 
@@ -832,7 +933,17 @@ const makeColorGradation = (_colorStr, { _defaultColorgrd = g_headerObj.defaultC
 	const alphaVal = (_shadowFlg && _objType !== `frz`) ? `80` : (_objType === `titleArrow` ? `40` : ``);
 
 	let convertColorStr = ``;
-	const tmpColorStr = _colorStr.split(`@`);
+	const tmpBackgroundStr = _colorStr.split(`;`);
+
+	// 色情報以外の部分を退避
+	const addData = tmpBackgroundStr[1] !== undefined ? tmpBackgroundStr.slice(1).join(` `) : ``;
+	if ([``, `-`, `none`].includes(tmpBackgroundStr[0]) ||
+		tmpBackgroundStr[0].startsWith(`url(`) || tmpBackgroundStr[0].startsWith(`var(`)) {
+		return addData;
+	}
+
+	// 色情報からグラデーションを作成
+	const tmpColorStr = tmpBackgroundStr[0].split(`@`);
 	const colorArray = tmpColorStr[0].split(`:`);
 	for (let j = 0; j < colorArray.length; j++) {
 		colorArray[j] = colorCdPadding(_colorCdPaddingUse, colorToHex(colorArray[j].replaceAll(`0x`, `#`)));
@@ -859,7 +970,7 @@ const makeColorGradation = (_colorStr, { _defaultColorgrd = g_headerObj.defaultC
 		convertColorStr += `${colorArray.join(', ')}`;
 	}
 
-	return `${gradationType}(${convertColorStr})`;
+	return `${hasVal(addData) ? `${addData} ` : ''}${gradationType}(${convertColorStr})`;
 };
 
 /*-----------------------------------------------------------*/
@@ -907,11 +1018,10 @@ const getFontSize = (_str, _maxWidth, _font = getBasicFont(), _maxFontsize = 64,
  * @param {string} _id 
  * @param {string} _str 
  * @param {string} _altId
- * @returns 
  */
 const createDescDiv = (_id, _str, _altId = _id) =>
 	createDivCss2Label(_id, _str, Object.assign(g_lblPosObj[_altId], {
-		siz: getFontSize(_str, g_sWidth, getBasicFont(), C_SIZ_MAIN),
+		siz: getFontSize(_str, g_sWidth, getBasicFont(), g_limitObj.mainSiz),
 	}));
 
 /*-----------------------------------------------------------*/
@@ -963,8 +1073,8 @@ const setUserSelect = (_style, _value = C_DIS_NONE) => {
  * @param {object} _obj (x, y, w, h, siz, align, ...rest)
  * @param {...any} _classes 
  */
-const createDivCss2Label = (_id, _text, { x = 0, y = 0, w = C_LEN_SETLBL_WIDTH, h = C_LEN_SETLBL_HEIGHT,
-	siz = C_SIZ_SETLBL, align = C_ALIGN_CENTER, ...rest } = {}, ..._classes) => {
+const createDivCss2Label = (_id, _text, { x = 0, y = 0, w = g_limitObj.setLblWidth, h = g_limitObj.setLblHeight,
+	siz = g_limitObj.setLblSiz, align = C_ALIGN_CENTER, ...rest } = {}, ..._classes) => {
 	const div = createDiv(_id, x, y, w, h, [g_cssObj.title_base, ..._classes]);
 
 	const style = div.style;
@@ -998,8 +1108,7 @@ const createImg = (_id, _imgPath, _x, _y, _width, _height) => {
  * @param {string} _parentObj
  * @param {string} _id
  * @param {function} _func 
- * @param {object} _obj 
- * @returns 
+ * @param {object} _obj
  */
 const createColorPicker = (_parentObj, _id, _func, { x = 0, y = 0 } = {}) => {
 	const picker = document.createElement(`input`);
@@ -1054,8 +1163,7 @@ const createColorObject2 = (_id,
  * @param {object} _parentObj 親スプライト
  * @param {string} _newObjId 作成する子スプライト名
  * @param {object} _obj (x, y, w, h, ...rest)
- * @param  {...any} _classes 
- * @returns 
+ * @param  {...any} _classes
  */
 const createEmptySprite = (_parentObj, _newObjId, { x = 0, y = 0, w = g_sWidth, h = g_sHeight, title = ``, ...rest } = {}, ..._classes) => {
 	if (document.getElementById(_newObjId) !== null) {
@@ -1150,8 +1258,8 @@ const deleteDiv = (_parentId, _idName) => {
  * @param {object} _obj (x, y, w, h, siz, align, title, groupName, initDisabledFlg, ...rest)
  * @param {...any} _classes 
  */
-const createCss2Button = (_id, _text, _func = _ => true, { x = 0, y = g_sHeight - 100, w = g_sWidth / 3, h = C_BTN_HEIGHT,
-	siz = C_LBL_BTNSIZE, align = C_ALIGN_CENTER, title = ``, groupName = g_currentPage, initDisabledFlg = true,
+const createCss2Button = (_id, _text, _func = _ => true, { x = 0, y = g_sHeight - 100, w = g_sWidth / 3, h = g_limitObj.btnHeight,
+	siz = g_limitObj.btnSiz, align = C_ALIGN_CENTER, title = ``, groupName = g_currentPage, initDisabledFlg = true,
 	resetFunc = _ => true, cxtFunc = _ => true, ...rest } = {}, ..._classes) => {
 
 	const div = createDiv(_id, x, y, w, h, [`button_common`, ..._classes]);
@@ -1189,6 +1297,8 @@ const createCss2Button = (_id, _text, _func = _ => true, { x = 0, y = g_sHeight 
 			resetFunc(evt);
 		}
 	});
+	g_btnFunc.base[_id] = _func;
+	g_btnFunc.reset[_id] = resetFunc;
 
 	// 右クリック時の処理
 	div.oncontextmenu = evt => {
@@ -1199,6 +1309,8 @@ const createCss2Button = (_id, _text, _func = _ => true, { x = 0, y = g_sHeight 
 			if (typeof g_cxtAddFunc[_id] === C_TYP_FUNCTION) {
 				g_cxtAddFunc[_id](evt, cxtFunc);
 			}
+			g_btnFunc.cxt[_id] = cxtFunc;
+
 		} else if (typeof g_cxtAddFunc[_id] === C_TYP_FUNCTION) {
 			g_cxtAddFunc[_id](evt);
 		}
@@ -1247,7 +1359,7 @@ const changeStyle = (_id, { x, y, w, h, siz, align, title, ...rest } = {}) => {
  * @param {number} _y 
  */
 const getTitleDivLabel = (_id, _titlename, _x, _y, ..._classes) =>
-	createDivCss2Label(_id, _titlename, { x: _x, y: _y, w: g_sWidth, h: 50, siz: C_LBL_BTNSIZE }, ..._classes);
+	createDivCss2Label(_id, _titlename, { x: _x, y: _y, w: g_sWidth, h: 50, siz: g_limitObj.btnSiz }, ..._classes);
 
 /**
  * キーコントロールの初期化
@@ -1256,7 +1368,7 @@ const resetKeyControl = _ => {
 	document.onkeyup = _ => { };
 	document.onkeydown = evt => {
 		evt.preventDefault();
-		return blockCode(transCode(evt.code));
+		return blockCode(evt.code);
 	};
 	g_inputKeyBuffer = {};
 };
@@ -1347,7 +1459,63 @@ const drawDefaultBackImage = _key => {
 	} else {
 		createEmptySprite(divRoot, `divBack`);
 	}
+
+	// CSSスタイルの初期化
+	Object.keys(g_cssBkProperties).forEach(prop =>
+		document.documentElement.style.setProperty(prop, g_cssBkProperties[prop]));
+
+	Object.keys(g_headerObj).filter(val => val.startsWith(`--`) && hasVal(g_headerObj[val])).forEach(prop =>
+		document.documentElement.style.setProperty(prop, getCssCustomProperty(prop, g_headerObj[prop])));
+
 };
+
+/**
+ * CSSカスタムプロパティの値を作成
+ * @param {string} _prop 
+ * @param {string} _propData 
+ */
+const getCssCustomProperty = (_prop, _propData) =>
+	document.documentElement.style.getPropertyValue(_propData) !== `` ?
+		document.documentElement.style.getPropertyValue(_propData) :
+		g_cssBkProperties[_propData] !== undefined ?
+			g_cssBkProperties[_propData] :
+			_prop.endsWith(`-x`) ? _propData : reviseCssText(makeColorGradation(_propData, { _defaultColorgrd: false }));
+
+/**
+ * CSSカスタムプロパティの値をオブジェクトへ退避
+ */
+const getCssCustomProperties = _ => {
+	try {
+		const htmlStyle = document.documentElement.computedStyleMap();
+		for (const [propertyName, value] of htmlStyle.entries()) {
+			if (/^--/.test(propertyName)) {
+				g_cssBkProperties[propertyName] = value.toString();
+			}
+		}
+	} catch (error) {
+
+		try {
+			// FirefoxではcomputedStyleMapが使えないため、
+			// CSSの全スタイルシート定義から :root がセレクタのルールを抽出し、カスタムプロパティを抽出
+			const sheets = document.styleSheets;
+			Array.from(sheets).filter(sheet => !g_isFile && sheet.href !== null &&
+				sheet.href.includes(`danoni_skin_`) && sheet.cssRules).forEach(sheet => {
+					for (const rule of sheet.cssRules) {
+						if (rule.selectorText === ':root') {
+							for (let i = 0; i < rule.style.length; i++) {
+								const propertyName = rule.style.item(i);
+								if (/^--/.test(propertyName)) {
+									g_cssBkProperties[propertyName] = rule.style.getPropertyValue(propertyName);
+								}
+							}
+						}
+					}
+				});
+		} catch (error) {
+			// 上記でもNGの場合は何もしない
+		}
+	}
+}
 
 /**
  * 背景・マスク用画像の描画
@@ -1391,7 +1559,7 @@ const makeSpriteText = _obj => {
  * @param {object, array} _obj 
  */
 const checkDuplicatedObjects = _obj => {
-	let addFrame = 0;
+	let dataCnts = 0;
 	if (_obj === undefined) {
 		_obj = [];
 		_obj[0] = [];
@@ -1399,17 +1567,17 @@ const checkDuplicatedObjects = _obj => {
 		for (let m = 1; ; m++) {
 			if (_obj[m] === undefined) {
 				_obj[m] = [];
-				addFrame = m;
+				dataCnts = m;
 				break;
 			}
 		}
 	}
-	return [_obj, addFrame];
+	return [_obj, dataCnts];
 };
 
 /**
  * 多層スプライトデータの作成処理
- * @param {array} _data 
+ * @param {string} _data 
  * @param {function} _calcFrame 
  */
 const makeSpriteData = (_data, _calcFrame = _frame => _frame) => {
@@ -1421,59 +1589,104 @@ const makeSpriteData = (_data, _calcFrame = _frame => _frame) => {
 		const tmpSpriteData = tmpData.split(`,`);
 
 		// 深度が"-"の場合はスキップ
-		if (tmpSpriteData.length > 1 && tmpSpriteData[1] !== `-`) {
+		if (tmpSpriteData.length <= 1 || tmpSpriteData[1] === `-`) {
+			return;
+		}
 
-			// 値チェックとエスケープ処理
-			let tmpFrame;
-			if (setIntVal(tmpSpriteData[0], -1) === 0) {
-				tmpFrame = 0;
-			} else {
-				tmpFrame = roundZero(_calcFrame(setVal(tmpSpriteData[0], 200, C_TYP_CALC)));
-			}
-			const tmpDepth = (tmpSpriteData[1] === C_FLG_ALL ? C_FLG_ALL : setVal(tmpSpriteData[1], 0, C_TYP_CALC));
-			if (tmpDepth !== C_FLG_ALL && tmpDepth > maxDepth) {
-				maxDepth = tmpDepth;
-			}
+		// 値チェックとエスケープ処理
+		const tmpFrame = setIntVal(tmpSpriteData[0], -1) === 0 ? 0 :
+			roundZero(_calcFrame(setVal(tmpSpriteData[0], 200, C_TYP_CALC)));
+		const tmpDepth = (tmpSpriteData[1] === C_FLG_ALL ? C_FLG_ALL : setVal(tmpSpriteData[1], 0, C_TYP_CALC));
+		if (tmpDepth !== C_FLG_ALL && tmpDepth > maxDepth) {
+			maxDepth = tmpDepth;
+		}
 
-			const tmpObj = {
-				path: escapeHtml(tmpSpriteData[2] ?? ``, g_escapeStr.escapeCode),   // 画像パス or テキスト
-				class: escapeHtml(tmpSpriteData[3] ?? ``),                          // CSSクラス
-				left: setVal(tmpSpriteData[4], 0, C_TYP_CALC),                      // X座標
-				top: setVal(tmpSpriteData[5], 0, C_TYP_CALC),                       // Y座標
-				width: setIntVal(tmpSpriteData[6]),                                 // spanタグの場合は font-size
-				height: escapeHtml(tmpSpriteData[7] ?? ``),                         // spanタグの場合は color(文字列可)
-				opacity: setVal(tmpSpriteData[8], 1, C_TYP_FLOAT),
-				animationName: escapeHtml(setVal(tmpSpriteData[9], C_DIS_NONE)),
-				animationDuration: setIntVal(tmpSpriteData[10]) / g_fps,
-			};
-			if (g_headerObj.autoPreload) {
-				if (checkImage(tmpObj.path)) {
-					if (g_headerObj.syncBackPath) {
-						const [file, dir] = getFilePath(tmpObj.path, `./`);
-						tmpObj.path = `${dir}${file}`;
-					}
-					preloadFile(`image`, tmpObj.path);
-				}
-			}
+		const tmpObj = {
+			path: escapeHtml(tmpSpriteData[2] ?? ``, g_escapeStr.escapeCode),   // 画像パス or テキスト
+			class: escapeHtml(tmpSpriteData[3] ?? ``),                          // CSSクラス
+			left: setVal(tmpSpriteData[4], `0`).includes(`{`) ?
+				`${setVal(tmpSpriteData[4], 0)}` : `{${setVal(tmpSpriteData[4], 0)}}`, // X座標
+			top: setVal(tmpSpriteData[5], `0`).includes(`{`) ?
+				`${setVal(tmpSpriteData[5], 0)}` : `{${setVal(tmpSpriteData[5], 0)}}`, // Y座標
+			width: `${setIntVal(tmpSpriteData[6])}`,                            // spanタグの場合は font-size
+			height: `${escapeHtml(tmpSpriteData[7] ?? ``)}`,                    // spanタグの場合は color(文字列可)
+			opacity: setVal(tmpSpriteData[8], 1, C_TYP_FLOAT),
+			animationName: escapeHtml(setVal(tmpSpriteData[9], C_DIS_NONE)),
+			animationDuration: setIntVal(tmpSpriteData[10]) / g_fps,
+		};
+		if (setVal(tmpSpriteData[11], g_presetObj.animationFillMode) !== undefined) {
+			tmpObj.animationFillMode = setVal(tmpSpriteData[11], g_presetObj.animationFillMode);
+		}
+		tmpObj.path = preloadImgFile(tmpObj.path, { syncBackPath: g_headerObj.syncBackPath });
 
-			let addFrame = 0;
-			[spriteData[tmpFrame], addFrame] =
-				checkDuplicatedObjects(spriteData[tmpFrame]);
+		let dataCnts = 0;
+		[spriteData[tmpFrame], dataCnts] =
+			checkDuplicatedObjects(spriteData[tmpFrame]);
 
-			const emptyPatterns = [``, `[loop]`, `[jump]`];
-			spriteData[tmpFrame][addFrame] = {
-				depth: tmpDepth,
-				command: tmpObj.path,
-				jumpFrame: tmpObj.class,
-				maxLoop: tmpObj.left,
+		const emptyPatterns = [``, `[loop]`, `[jump]`];
+		const colorObjFlg = tmpSpriteData[2]?.startsWith(`[c]`) || false;
+		const spriteFrameData = spriteData[tmpFrame][dataCnts] = {
+			depth: tmpDepth,
+		};
+
+		if (colorObjFlg) {
+			// [c]始まりの場合、カラーオブジェクト用の作成準備を行う
+			const data = tmpObj.path.slice(`[c]`.length).split(`/`);
+			spriteFrameData.colorObjInfo = {
+				x: tmpObj.left, y: tmpObj.top, w: tmpObj.width, h: tmpObj.height,
+				rotate: setVal(data[0], `0`), opacity: tmpObj.opacity,
+				background: makeColorGradation(setVal(data[1], `#ffffff`), { _defaultColorgrd: false }),
 				animationName: tmpObj.animationName,
-				htmlText: emptyPatterns.includes(tmpObj.path) ?
-					`` : (checkImage(tmpObj.path) ? makeSpriteImage(tmpObj) : makeSpriteText(tmpObj)),
+				animationDuration: `${tmpObj.animationDuration}s`,
 			};
+			spriteFrameData.colorObjId = `${tmpFrame}_${dataCnts}`;
+			spriteFrameData.colorObjClass = setVal(tmpObj.class, undefined);
+			if (tmpObj.animationFillMode !== undefined) {
+				spriteFrameData.colorObjInfo.animationFillMode = tmpObj.animationFillMode;
+			}
+
+		} else if (emptyPatterns.includes(tmpObj.path)) {
+			// ループ、フレームジャンプ、空の場合の処理
+			spriteFrameData.command = tmpObj.path;
+			spriteFrameData.jumpFrame = tmpObj.class;
+			spriteFrameData.maxLoop = tmpObj.left;
+			spriteFrameData.htmlText = ``;
+		} else {
+			// それ以外の画像、テキストの場合
+			spriteFrameData.animationName = tmpObj.animationName;
+			spriteFrameData.htmlText = (checkImage(tmpObj.path) ? makeSpriteImage(tmpObj) : makeSpriteText(tmpObj));
 		}
 	});
 
 	return [spriteData, maxDepth];
+};
+
+/**
+ * スタイル変更データの作成処理
+ * @param {string} _data 
+ * @param {function} _calcFrame 
+ * @returns 
+ */
+const makeStyleData = (_data, _calcFrame = _frame => _frame) => {
+	const spriteData = [];
+	splitLF(_data).filter(data => hasVal(data)).forEach(tmpData => {
+		const tmpSpriteData = tmpData.split(`,`);
+
+		// カスタムプロパティの名称(--始まり)で無い場合はコメントと見做してスキップ
+		if (tmpSpriteData.length <= 1 || !tmpSpriteData[1].startsWith(`--`)) {
+			return;
+		}
+		const tmpFrame = setIntVal(tmpSpriteData[0], -1) === 0 ? 0 :
+			roundZero(_calcFrame(setVal(tmpSpriteData[0], 200, C_TYP_CALC)));
+
+		let dataCnts = 0;
+		[spriteData[tmpFrame], dataCnts] = checkDuplicatedObjects(spriteData[tmpFrame]);
+		spriteData[tmpFrame][dataCnts] = {
+			depth: tmpSpriteData[1],
+			styleData: getCssCustomProperty(tmpSpriteData[1], tmpSpriteData[2]),
+		};
+	});
+	return [spriteData, 1];
 };
 
 /**
@@ -1510,7 +1723,16 @@ const drawBaseSpriteData = (_spriteData, _name, _condition = true) => {
 		}
 	} else {
 		if (_condition) {
-			baseSprite.innerHTML = _spriteData.htmlText;
+			if (_spriteData.colorObjInfo !== undefined) {
+				const colorObjClass = _spriteData.colorObjClass?.split(`/`) ?? [];
+				const id = `${_name}${_spriteData.depth}${_spriteData.colorObjId}`;
+				[`x`, `y`, `w`, `h`].forEach(val => _spriteData.colorObjInfo[val] = convertStrToVal(_spriteData.colorObjInfo[val]));
+				baseSprite.appendChild(
+					createColorObject2(id, _spriteData.colorObjInfo, ...colorObjClass)
+				);
+			} else {
+				baseSprite.innerHTML = convertStrToVal(_spriteData.htmlText);
+			}
 		}
 	}
 };
@@ -1556,6 +1778,22 @@ const drawMainSpriteData = (_frame, _depthName) =>
 	g_scoreObj[`${_depthName}Data`][_frame].forEach(tmpObj => drawBaseSpriteData(tmpObj, _depthName));
 
 /**
+ * スタイル切替
+ * @param {number} _frame 
+ * @param {string} _displayName
+ */
+const drawStyleData = (_frame, _displayName) => {
+	g_headerObj[`style${toCapitalize(_displayName)}Data`][_frame].forEach(tmpObj =>
+		document.documentElement.style.setProperty(tmpObj.depth, tmpObj.styleData));
+
+	return _frame;
+};
+
+const drawMainStyleData = (_frame) =>
+	g_scoreObj.styleData[_frame].forEach(tmpObj =>
+		document.documentElement.style.setProperty(tmpObj.depth, tmpObj.styleData));
+
+/**
  * タイトル・リザルトモーションの描画
  * @param {string} _displayName
  */
@@ -1563,7 +1801,7 @@ const drawTitleResultMotion = _displayName => {
 	g_animationData.forEach(sprite => {
 		const spriteName = `${sprite}${toCapitalize(_displayName)}`;
 		if (g_headerObj[`${spriteName}Data`][g_scoreObj[`${spriteName}FrameNum`]] !== undefined) {
-			g_scoreObj[`${spriteName}FrameNum`] = drawSpriteData(g_scoreObj[`${spriteName}FrameNum`], _displayName, sprite);
+			g_scoreObj[`${spriteName}FrameNum`] = g_animationFunc.draw[sprite](g_scoreObj[`${spriteName}FrameNum`], _displayName, sprite);
 		}
 	});
 };
@@ -1590,10 +1828,7 @@ class AudioPlayer {
 			this._duration = _buffer.duration;
 			this._buffer = _buffer;
 		});
-
-		if (this._eventListeners[`canplaythrough`] !== undefined) {
-			this._eventListeners[`canplaythrough`].forEach(_listener => _listener());
-		}
+		this._eventListeners[`canplaythrough`]?.forEach(_listener => _listener());
 	}
 
 	play(_adjustmentTime = 0) {
@@ -1698,8 +1933,8 @@ const getQueryParamVal = _name => {
  * ローディング文字用ラベルの作成
  */
 const getLoadingLabel = _ => createDivCss2Label(`lblLoading`, g_lblNameObj.nowLoading, {
-	x: 0, y: g_sHeight - 40, w: g_sWidth, h: C_LEN_SETLBL_HEIGHT,
-	siz: C_SIZ_SETLBL, align: C_ALIGN_RIGHT,
+	x: 0, y: g_sHeight - 40, w: g_sWidth, h: g_limitObj.setLblHeight,
+	siz: g_limitObj.setLblSiz, align: C_ALIGN_RIGHT,
 });
 
 /**
@@ -1770,7 +2005,7 @@ const initialControl = async () => {
 	await loadChartFile(0);
 
 	// 共通設定ファイルの指定
-	let [settingType, settingRoot] = getFilePath(g_rootObj.settingType ?? ``, C_DIR_JS);
+	let [settingType, settingRoot] = getFilePath(g_rootObj.settingType ?? ``);
 	if (settingType !== ``) {
 		settingType = `_${settingType}`;
 	}
@@ -1804,13 +2039,16 @@ const initialControl = async () => {
 
 	// 譜面ヘッダー、特殊キー情報の読込
 	Object.assign(g_headerObj, headerConvert(g_rootObj));
+	const importKeysData = _data => {
+		keysConvert(dosConvert(_data));
+		g_headerObj.undefinedKeyLists = g_headerObj.undefinedKeyLists.filter(key => g_keyObj[`${g_keyObj.defaultProp}${key}_0`] === undefined);
+	};
+	g_presetObj.keysDataLib.forEach(list => importKeysData(list));
 	if (g_presetObj.keysData !== undefined) {
-		keysConvert(dosConvert(g_presetObj.keysData));
-		g_headerObj.undefinedKeyLists = g_headerObj.undefinedKeyLists.filter(key => g_keyObj[`chara${key}_0`] === undefined);
+		importKeysData(g_presetObj.keysData);
 	}
 	g_headerObj.keyExtraList = keysConvert(g_rootObj, {
-		keyExtraList: (g_rootObj.keyExtraList !== undefined ?
-			makeDedupliArray(g_rootObj.keyExtraList.split(`,`), g_headerObj.undefinedKeyLists) : g_headerObj.undefinedKeyLists),
+		keyExtraList: makeDedupliArray(g_headerObj.undefinedKeyLists, g_rootObj.keyExtraList?.split(`,`)),
 	});
 
 	// デフォルトのカラー・シャッフルグループ設定を退避
@@ -1948,11 +2186,12 @@ const loadLocalStorage = _ => {
 	if (checkStorage) {
 		g_localStorage = JSON.parse(checkStorage);
 
-		// Adjustment, Volume, Appearance, Opacity初期値設定
-		checkLocalParam(`adjustment`, C_TYP_FLOAT, C_MAX_ADJUSTMENT);
+		// Adjustment, Volume, Appearance, Opacity, HitPosition初期値設定
+		checkLocalParam(`adjustment`, C_TYP_FLOAT, g_settings.adjustmentNum);
 		checkLocalParam(`volume`, C_TYP_NUMBER, g_settings.volumes.length - 1);
 		checkLocalParam(`appearance`);
 		checkLocalParam(`opacity`, C_TYP_NUMBER, g_settings.opacitys.length - 1);
+		checkLocalParam(`hitPosition`, C_TYP_FLOAT, g_settings.hitPositionNum);
 		checkLocalParam(`errorbar`);
 		checkLocalParam(`ratioType`);
 
@@ -1971,6 +2210,7 @@ const loadLocalStorage = _ => {
 	} else {
 		g_localStorage = {
 			adjustment: 0,
+			hitPosition: 0,
 			volume: 100,
 			highscores: {},
 		};
@@ -1981,7 +2221,7 @@ const loadLocalStorage = _ => {
  * 譜面データを分割して値を取得
  * @param {string} _dos 譜面データ
  */
-const dosConvert = _dos => {
+const dosConvert = (_dos = ``) => {
 
 	const obj = {};
 	const paramsTmp = g_enableAmpersandSplit ? _dos.split(`&`).join(`|`) : _dos;
@@ -2073,8 +2313,7 @@ const resetColorAndGauge = _scoreId => {
 /**
  * 譜面番号固定かつ譜面ファイル分割時に初期色情報を他譜面へコピー
  * @param {object} _baseObj 
- * @param {number} _scoreId 
- * @returns 
+ * @param {number} _scoreId
  */
 const copySetColor = (_baseObj, _scoreId) => {
 	const obj = {};
@@ -2091,8 +2330,7 @@ const copySetColor = (_baseObj, _scoreId) => {
 
 /**
  * MusicUrlの基本情報を取得
- * @param {number} _scoreId 
- * @returns 
+ * @param {number} _scoreId
  */
 const getMusicUrl = _scoreId => {
 	return g_headerObj.musicUrls !== undefined ?
@@ -2120,11 +2358,11 @@ const storeBaseData = (_scoreId, _scoreObj, _keyCtrlPtn) => {
 	const startFrame = getStartFrame(lastFrame, 0, _scoreId);
 	const firstArrowFrame = getFirstArrowFrame(_scoreObj, _keyCtrlPtn);
 	const playingFrame = lastFrame - firstArrowFrame;
-	const keyNum = g_keyObj[`chara${_keyCtrlPtn}`].length;
+	const keyNum = g_keyObj[`${g_keyObj.defaultProp}${_keyCtrlPtn}`].length;
 
 	// 譜面密度グラフ用のデータ作成
 	const noteCnt = { arrow: [], frz: [] };
-	const densityData = [...Array(C_LEN_DENSITY_DIVISION)].fill(0);
+	const densityData = [...Array(g_limitObj.densityDivision)].fill(0);
 	let allData = 0;
 
 	const types = [`arrow`, `frz`];
@@ -2134,31 +2372,30 @@ const storeBaseData = (_scoreId, _scoreObj, _keyCtrlPtn) => {
 		noteCnt.frz[j] = 0;
 
 		const tmpFrzData = _scoreObj.frzData[j].filter((data, k) => k % 2 === 0);
-		[_scoreObj.arrowData[j], tmpFrzData].forEach((typeData, m) => {
+		[_scoreObj.arrowData[j], tmpFrzData].forEach((typeData, m) =>
 			typeData.forEach(note => {
 				if (isNaN(parseFloat(note))) {
 					return;
 				}
-				const point = Math.floor((note - firstArrowFrame) / playingFrame * C_LEN_DENSITY_DIVISION);
+				const point = Math.floor((note - firstArrowFrame) / playingFrame * g_limitObj.densityDivision);
 				if (point >= 0) {
 					densityData[point]++;
 					noteCnt[types[m]][j]++;
 					allData++;
 				}
-			});
-		});
+			}));
 		fullData = fullData.concat(..._scoreObj.arrowData[j], ...tmpFrzData);
 	}
 
 	fullData = fullData.filter(val => !isNaN(parseFloat(val))).sort((a, b) => a - b);
 	let pushCnt = 1;
-	const density2PushData = [...Array(C_LEN_DENSITY_DIVISION)].fill(0);
-	const density3PushData = [...Array(C_LEN_DENSITY_DIVISION)].fill(0);
+	const density2PushData = [...Array(g_limitObj.densityDivision)].fill(0);
+	const density3PushData = [...Array(g_limitObj.densityDivision)].fill(0);
 	fullData.forEach((note, j) => {
 		if (fullData[j] === fullData[j + 1]) {
 			pushCnt++;
 		} else {
-			const point = Math.floor((note - firstArrowFrame) / playingFrame * C_LEN_DENSITY_DIVISION);
+			const point = Math.floor((note - firstArrowFrame) / playingFrame * g_limitObj.densityDivision);
 			if (point >= 0) {
 				if (pushCnt >= 2) {
 					density2PushData[point] += pushCnt;
@@ -2177,8 +2414,8 @@ const storeBaseData = (_scoreId, _scoreObj, _keyCtrlPtn) => {
 
 	const storeDensity = _densityData => {
 		const dataList = [];
-		for (let j = 0; j < C_LEN_DENSITY_DIVISION; j++) {
-			dataList.push(allData === 0 ? 0 : Math.round(_densityData[j] / allData * C_LEN_DENSITY_DIVISION * 10000) / 100);
+		for (let j = 0; j < g_limitObj.densityDivision; j++) {
+			dataList.push(allData === 0 ? 0 : Math.round(_densityData[j] / allData * g_limitObj.densityDivision * 10000) / 100);
 		}
 		return dataList;
 	};
@@ -2195,7 +2432,7 @@ const storeBaseData = (_scoreId, _scoreObj, _keyCtrlPtn) => {
 	g_detailObj.density2PushDiff[_scoreId] = diffArray(g_detailObj.density2PushData[_scoreId], g_detailObj.density3PushData[_scoreId]);
 	g_detailObj.density3PushDiff[_scoreId] = g_detailObj.density3PushData[_scoreId].concat();
 
-	g_detailObj.maxDensity[_scoreId] = densityData.indexOf(Math.max.apply(null, densityData));
+	g_detailObj.maxDensity[_scoreId] = getMaxValIdxs(densityData, g_limitObj.densityMaxVals).flat();
 
 	g_detailObj.arrowCnt[_scoreId] = noteCnt.arrow.concat();
 	g_detailObj.frzCnt[_scoreId] = noteCnt.frz.concat();
@@ -2347,7 +2584,7 @@ const calcLevel = _scoreObj => {
 	const push3Cnt = push3List.length;
 	const calcArrowCnt = allCnt - push3Cnt - 3;
 	const toDecimal2 = num => Math.round(num * 100) / 100;
-	const calcDifLevel = num => calcArrowCnt <= 0 ? 0 : toDecimal2(num / Math.sqrt(calcArrowCnt) * 4);
+	const calcDifLevel = num => calcArrowCnt > 0 ? toDecimal2(num / Math.sqrt(calcArrowCnt) * 4) : 0;
 
 	const baseDifLevel = calcDifLevel(levelcount);
 	const difLevel = toDecimal2(baseDifLevel * (allCnt - 3) / calcArrowCnt);
@@ -2370,9 +2607,28 @@ const calcLevel = _scoreObj => {
 };
 
 /**
+ * ロケールを含んだヘッダーの優先度設定
+ * @param {object} _obj 
+ * @param {...any} _params
+ */
+const getHeader = (_obj, ..._params) => {
+	let headerLocale, headerDf;
+	Object.keys(_params).forEach(j => {
+		headerLocale ??= _obj[`${_params[j]}${g_localeObj.val}`];
+		headerDf ??= _obj[_params[j]];
+	});
+	return headerLocale ?? headerDf;
+};
+
+/**
+ * ヘッダー名の互換設定
+ * @param {string} _param 
+ */
+const getHname = _param => [_param, _param.toLowerCase()];
+
+/**
  * 譜面ヘッダーの分解（スキン、jsファイルなどの設定）
- * @param {object} _dosObj 
- * @returns 
+ * @param {object} _dosObj
  */
 const preheaderConvert = _dosObj => {
 
@@ -2386,15 +2642,15 @@ const preheaderConvert = _dosObj => {
 	}
 
 	obj.jsData = [];
+	obj.stepRtnUse = true;
 
-	const setJsFiles = (_files, _defaultDir, _type = `custom`) => {
+	const setJsFiles = (_files, _defaultDir, _type = `custom`) =>
 		_files.forEach(file => {
 			if (hasVal(file)) {
 				const [jsFile, jsDir] = getFilePath(file, _defaultDir);
 				obj.jsData.push([_type === `skin` ? `danoni_skin_${jsFile}.js` : jsFile, jsDir]);
 			}
 		});
-	};
 
 	// 外部スキンファイルの指定
 	const tmpSkinType = _dosObj.skinType ?? g_presetObj.skinType ?? `default`;
@@ -2403,11 +2659,11 @@ const preheaderConvert = _dosObj => {
 	setJsFiles(tmpSkinTypes, C_DIR_SKIN, `skin`);
 
 	// 外部jsファイルの指定
-	const tmpCustomjs = _dosObj.customjs ?? g_presetObj.customJs ?? C_JSF_CUSTOM;
+	const tmpCustomjs = getHeader(_dosObj, ...getHname(`customJs`)) ?? g_presetObj.customJs ?? C_JSF_CUSTOM;
 	setJsFiles(tmpCustomjs.replaceAll(`*`, g_presetObj.customJs).split(`,`), C_DIR_JS);
 
 	// 外部cssファイルの指定
-	const tmpCustomcss = _dosObj.customcss ?? g_presetObj.customCss ?? ``;
+	const tmpCustomcss = getHeader(_dosObj, ...getHname(`customCss`)) ?? g_presetObj.customCss ?? ``;
 	setJsFiles(tmpCustomcss.replaceAll(`*`, g_presetObj.customCss).split(`,`), C_DIR_CSS);
 
 	// デフォルト曲名表示、背景、Ready表示の利用有無
@@ -2432,13 +2688,18 @@ const headerConvert = _dosObj => {
 	// ヘッダー群の格納先
 	const obj = {};
 
-	/**
-	 * ロケールを含んだヘッダーの取得
-	 * @param {object} _obj 
-	 * @param {string} _param 
-	 * @returns 
-	 */
-	const getHeader = (_obj, _param) => _obj[`${_param}${g_localeObj.val}`] ?? _obj[_param];
+	// 自動プリロードの設定
+	obj.autoPreload = setBoolVal(_dosObj.autoPreload, true);
+	g_headerObj.autoPreload = obj.autoPreload;
+
+	// デフォルトスタイルのバックアップ
+	getCssCustomProperties();
+
+	// 初期で変更するカスタムプロパティを設定
+	Object.keys(_dosObj).filter(val => val.startsWith(`--`) && hasVal(_dosObj[val])).forEach(prop => {
+		g_cssBkProperties[prop] = getCssCustomProperty(prop, _dosObj[prop]);
+		document.documentElement.style.setProperty(prop, g_cssBkProperties[prop]);
+	});
 
 	// フォントの設定
 	obj.customFont = _dosObj.customFont ?? ``;
@@ -2546,12 +2807,12 @@ const headerConvert = _dosObj => {
 		obj.minSpeed = C_MIN_SPEED;
 		obj.maxSpeed = C_MAX_SPEED;
 	}
-	g_settings.speeds = [...Array((obj.maxSpeed - obj.minSpeed) * 20 + 1).keys()].map(i => obj.minSpeed + i / 20);
+	g_settings.speeds = makeSpeedList(obj.minSpeed, obj.maxSpeed);
 
 	// プレイ中のショートカットキー
-	obj.keyRetry = setIntVal(_dosObj.keyRetry, C_KEY_RETRY);
+	obj.keyRetry = setIntVal(getKeyCtrlVal(_dosObj.keyRetry), C_KEY_RETRY);
 	obj.keyRetryDef = obj.keyRetry;
-	obj.keyTitleBack = setIntVal(_dosObj.keyTitleBack, C_KEY_TITLEBACK);
+	obj.keyTitleBack = setIntVal(getKeyCtrlVal(_dosObj.keyTitleBack), C_KEY_TITLEBACK);
 	obj.keyTitleBackDef = obj.keyTitleBack;
 
 	// フリーズアローの許容フレーム数設定
@@ -2625,11 +2886,12 @@ const headerConvert = _dosObj => {
 		obj.creatorNames = [obj.tuning];
 	}
 	const keyLists = makeDedupliArray(obj.keyLabels);
+	obj.viewLists = [...Array(obj.keyLabels.length).keys()];
 	obj.keyLists = keyLists.sort((a, b) => parseInt(a) - parseInt(b));
-	obj.undefinedKeyLists = obj.keyLists.filter(key => g_keyObj[`chara${key}_0`] === undefined);
+	obj.undefinedKeyLists = obj.keyLists.filter(key => g_keyObj[`${g_keyObj.defaultProp}${key}_0`] === undefined);
 
 	// 譜面変更セレクターの利用有無
-	obj.difSelectorUse = (setBoolVal(_dosObj.difSelectorUse, obj.keyLabels.length > 5));
+	obj.difSelectorUse = getDifSelectorUse(_dosObj.difSelectorUse, obj.viewLists);
 
 	// 初期速度の設定
 	g_stateObj.speed = obj.initSpeeds[g_stateObj.scoreId];
@@ -2726,13 +2988,13 @@ const headerConvert = _dosObj => {
 	}
 
 	// 無音のフレーム数
-	obj.blankFrame = 200;
-	obj.blankFrameDef = 200;
+	obj.blankFrameDefs = [200];
 	if (isNaN(parseFloat(_dosObj.blankFrame))) {
 	} else {
-		obj.blankFrame = parseInt(_dosObj.blankFrame);
-		obj.blankFrameDef = parseInt(_dosObj.blankFrame);
+		obj.blankFrameDefs = _dosObj.blankFrame.split(`$`).map(val => parseInt(val));
 	}
+	obj.blankFrame = obj.blankFrameDefs[0];
+	obj.blankFrameDef = obj.blankFrameDefs[0];
 
 	// 開始フレーム数（0以外の場合はフェードインスタート）、終了フレーム数
 	[`startFrame`, `endFrame`].filter(tmpParam => hasVal(_dosObj[tmpParam])).forEach(param => {
@@ -2785,15 +3047,19 @@ const headerConvert = _dosObj => {
 	// ハッシュタグ
 	obj.hashTag = _dosObj.hashTag ?? ``;
 
-	// 自動プリロードの設定
-	obj.autoPreload = setBoolVal(_dosObj.autoPreload, true);
-	g_headerObj.autoPreload = obj.autoPreload;
-
 	// 読込対象の画像を指定(rel:preload)と同じ
 	obj.preloadImages = [];
 	if (hasVal(_dosObj.preloadImages)) {
 		obj.preloadImages = _dosObj.preloadImages.split(`,`).filter(image => hasVal(image)).map(preloadImage => preloadImage);
 	}
+
+	// 初期表示する部分キーの設定
+	obj.keyGroupOrder = [];
+	_dosObj.keyGroupOrder?.split(`$`).forEach((val, j) => {
+		if (val !== ``) {
+			obj.keyGroupOrder[j] = val.split(`,`);
+		}
+	});
 
 	// 最終演出表示有無（noneで無効化）
 	obj.finishView = _dosObj.finishView ?? ``;
@@ -2819,29 +3085,30 @@ const headerConvert = _dosObj => {
 	obj.readyHtml = _dosObj.readyHtml ?? ``;
 
 	// デフォルト曲名表示のフォントサイズ
-	obj.titlesize = getHeader(_dosObj, `titlesize`) ?? ``;
+	obj.titlesize = getHeader(_dosObj, ...getHname(`titleSize`)) ?? ``;
 
 	// デフォルト曲名表示のフォント名
 	// (使用例： |titlefont=Century,Meiryo UI|)
 	obj.titlefonts = g_titleLists.defaultFonts.concat();
-	getHeader(_dosObj, `titlefont`)?.split(`$`).forEach((font, j) => obj.titlefonts[j] = `'${(font.replaceAll(`,`, `', '`))}'`);
+	getHeader(_dosObj, ...getHname(`titleFont`))?.split(`$`).forEach((font, j) => obj.titlefonts[j] = `'${(font.replaceAll(`,`, `', '`))}'`);
 	if (obj.titlefonts[1] === undefined) {
 		obj.titlefonts[1] = obj.titlefonts[0];
 	}
 
 	// デフォルト曲名表示, 背景矢印のグラデーション指定css
-	g_titleLists.grdList.forEach(_name => {
-		obj[`${_name}s`] = [];
-		if (hasVal(_dosObj[_name])) {
-			const tmpTitlegrd = _dosObj[_name].replaceAll(`,`, `:`);
-			obj[`${_name}s`] = tmpTitlegrd.split(`$`);
-			obj[`${_name}`] = obj[`${_name}s`][0] ?? ``;
+	[`titlegrd`, `titleArrowgrd`].forEach(_name => {
+		const objName = `${_name.toLowerCase()}`;
+		obj[`${objName}s`] = [];
+		const tmpTitlegrd = getHeader(_dosObj, ...getHname(_name))?.replaceAll(`,`, `:`);
+		if (hasVal(tmpTitlegrd)) {
+			obj[`${objName}s`] = tmpTitlegrd.split(`$`);
+			obj[`${objName}`] = obj[`${objName}s`][0] ?? ``;
 		}
 	});
 
 	// デフォルト曲名表示の表示位置調整
 	obj.titlepos = [[0, 0], [0, 0]];
-	getHeader(_dosObj, `titlepos`)?.split(`$`).forEach((pos, j) => obj.titlepos[j] = pos.split(`,`).map(x => parseFloat(x)));
+	getHeader(_dosObj, ...getHname(`titlePos`))?.split(`$`).forEach((pos, j) => obj.titlepos[j] = pos.split(`,`).map(x => parseFloat(x)));
 
 	// タイトル文字のアニメーション設定
 	obj.titleAnimationName = [`leftToRight`];
@@ -2850,31 +3117,34 @@ const headerConvert = _dosObj => {
 	obj.titleAnimationTimingFunction = [`ease`];
 	obj.titleAnimationClass = [``];
 
-	_dosObj.titleanimation?.split(`$`).forEach((pos, j) => {
+	getHeader(_dosObj, ...getHname(`titleAnimation`))?.split(`$`).forEach((pos, j) => {
 		const titleAnimation = pos.split(`,`);
 		obj.titleAnimationName[j] = setVal(titleAnimation[0], obj.titleAnimationName[0]);
 		obj.titleAnimationDuration[j] = setVal(titleAnimation[1] / g_fps, obj.titleAnimationDuration[0], C_TYP_FLOAT);
 		obj.titleAnimationDelay[j] = setVal(titleAnimation[2] / g_fps, obj.titleAnimationDelay[0], C_TYP_FLOAT);
 		obj.titleAnimationTimingFunction[j] = setVal(titleAnimation[3], obj.titleAnimationName[3]);
 	});
-	_dosObj.titleanimationclass?.split(`$`).forEach((animationClass, j) => {
-		obj.titleAnimationClass[j] = animationClass ?? ``;
-	});
+	getHeader(_dosObj, ...getHname(`titleAnimationClass`))?.split(`$`).forEach((animationClass, j) =>
+		obj.titleAnimationClass[j] = animationClass ?? ``);
 
 	if (obj.titleAnimationName.length === 1) {
-		g_titleLists.animation.forEach(pattern => {
-			obj[`titleAnimation${pattern}`][1] = obj[`titleAnimation${pattern}`][0];
-		});
+		g_titleLists.animation.forEach(pattern =>
+			obj[`titleAnimation${pattern}`][1] = obj[`titleAnimation${pattern}`][0]);
 	}
 	if (obj.titleAnimationClass.length === 1) {
 		obj.titleAnimationClass[1] = obj.titleAnimationClass[0];
 	}
 
 	// デフォルト曲名表示の複数行時の縦間隔
-	obj.titlelineheight = setIntVal(getHeader(_dosObj, `titlelineheight`), ``);
+	obj.titlelineheight = setIntVal(getHeader(_dosObj, ...getHname(`titleLineHeight`)), ``);
 
 	// フリーズアローの始点で通常矢印の判定を行うか(dotさんソース方式)
 	obj.frzStartjdgUse = setBoolVal(_dosObj.frzStartjdgUse ?? g_presetObj.frzStartjdgUse);
+
+	// 空押し判定を行うか
+	obj.excessiveJdgUse = setBoolVal(_dosObj.excessiveJdgUse ?? g_presetObj.excessiveJdgUse);
+	g_stateObj.excessive = obj.excessiveJdgUse ? C_FLG_ON : C_FLG_OFF;
+	g_settings.excessiveNum = obj.excessiveJdgUse ? 1 : 0;
 
 	// 譜面名に制作者名を付加するかどうかのフラグ
 	obj.makerView = setBoolVal(_dosObj.makerView);
@@ -2886,9 +3156,8 @@ const headerConvert = _dosObj => {
 	}
 
 	// オプション利用可否設定
-	g_canDisabledSettings.forEach(option => {
-		obj[`${option}Use`] = setBoolVal(_dosObj[`${option}Use`] ?? g_presetObj.settingUse?.[option], true);
-	});
+	g_canDisabledSettings.forEach(option =>
+		obj[`${option}Use`] = setBoolVal(_dosObj[`${option}Use`] ?? g_presetObj.settingUse?.[option], true));
 
 	let interlockingErrorFlg = false;
 	g_displays.forEach((option, j) => {
@@ -2921,17 +3190,14 @@ const headerConvert = _dosObj => {
 	});
 
 	if (!interlockingErrorFlg) {
-		g_displays.forEach(option => {
+		g_displays.forEach(option =>
 			obj[`${option}ChainOFF`].forEach(defaultOption => {
 				g_stateObj[`d_${defaultOption.toLowerCase()}`] = C_FLG_OFF;
 				interlockingButton(obj, defaultOption, C_FLG_OFF, C_FLG_ON);
-			});
-		});
+			}));
 	}
 
-	// ローカルストレージに保存済みのAppearance, Opacity設定・ColorType設定を戻す
-	g_storeSettings.filter(tmpSetting => hasVal(g_localStorage[tmpSetting])).forEach(setting =>
-		g_stateObj[setting] = g_localStorage[setting]);
+	// ローカルストレージに保存済みのColorType設定からDisplayのColor設定を反映
 	if (g_localStorage.colorType !== undefined) {
 		g_colorType = g_localStorage.colorType;
 		if (obj.colorUse) {
@@ -2946,13 +3212,12 @@ const headerConvert = _dosObj => {
 	// [フレーム数,階層,背景パス,class(CSSで別定義),X,Y,width,height,opacity,animationName,animationDuration]
 	g_animationData.forEach(sprite => {
 		obj[`${sprite}TitleData`] = [];
-		obj[`${sprite}TitleData`].length = 0;
 		obj[`${sprite}TitleMaxDepth`] = -1;
 
 		const dataList = [_dosObj[`${sprite}title${g_localeObj.val}_data`], _dosObj[`${sprite}title_data`]];
 		const data = dataList.find((v) => v !== undefined);
 		if (hasVal(data)) {
-			[obj[`${sprite}TitleData`], obj[`${sprite}TitleMaxDepth`]] = makeSpriteData(data);
+			[obj[`${sprite}TitleData`], obj[`${sprite}TitleMaxDepth`]] = g_animationFunc.make[sprite](data);
 		}
 	});
 
@@ -2969,7 +3234,14 @@ const headerConvert = _dosObj => {
 	obj.resultMotionSet = setBoolVal(_dosObj.resultMotionSet, true);
 
 	// 譜面明細の使用可否
-	obj.scoreDetailUse = setBoolVal(_dosObj.scoreDetailUse, true);
+	const tmpDetails = getHeader(_dosObj, `scoreDetailUse`, `chartDetailUse`)?.split(`,`).filter(val => hasVal(val) && val !== `false`)
+		.map(val => replaceStr(val, g_settings.scoreDetailTrans));
+	g_settings.scoreDetails = g_settings.scoreDetailDefs.filter(val => tmpDetails?.includes(val) || tmpDetails === undefined);
+
+	g_stateObj.scoreDetail = g_settings.scoreDetails[0] || ``;
+	g_settings.scoreDetailCursors = g_settings.scoreDetails.map(val => `lnk${val}G`);
+	g_settings.scoreDetailCursors.push(`btnGraphB`);
+	[`option`, `difSelector`].forEach(page => g_shortcutObj[page].KeyQ.id = g_settings.scoreDetailCursors[0]);
 
 	// 判定位置をBackgroundのON/OFFと連動してリセットする設定
 	obj.jdgPosReset = setBoolVal(_dosObj.jdgPosReset, true);
@@ -2999,7 +3271,7 @@ const headerConvert = _dosObj => {
 	obj.playingX = setIntVal(_dosObj.playingX);
 
 	// プレイ中クレジットを表示しないエリアのサイズ(X方向)
-	obj.customViewWidth = setVal(_dosObj.customViewWidth, 0, C_TYP_FLOAT);
+	obj.customViewWidth = setVal(_dosObj.customViewWidth ?? _dosObj.customCreditWidth, 0, C_TYP_FLOAT);
 
 	// ジャストフレームの設定 (ローカル: 0フレーム, リモートサーバ上: 1フレーム以内)
 	obj.justFrames = (g_isLocal) ? 0 : 1;
@@ -3029,6 +3301,13 @@ const headerConvert = _dosObj => {
 };
 
 /**
+ * 譜面リスト作成有無の状態を取得
+ * @param {boolean} _headerFlg 
+ * @param {array} _viewLists 
+ */
+const getDifSelectorUse = (_headerFlg, _viewLists = g_headerObj.viewLists) => setBoolVal(_headerFlg, _viewLists.length > 5);
+
+/**
  * カラーセットの格納
  * @param {object} obj 
  */
@@ -3043,7 +3322,6 @@ const resetColorType = ({ _from = ``, _to = ``, _fromObj = g_headerObj, _toObj =
  * 配列にデータを先頭に追加
  * @param {array} _arr 
  * @param {string} _target 
- * @returns 
  */
 const addValtoArray = (_arr, _target) => {
 	if (!_arr.includes(_target)) {
@@ -3100,15 +3378,22 @@ const resetBaseColorList = (_baseObj, _dosObj, { scoreId = `` } = {}) => {
 
 	const obj = {};
 	const scoreIdHeader = setScoreIdHeader(scoreId);
+	const getRefData = (_header, _dataName) => {
+		const data = _dosObj[`${_header}${_dataName}`];
+		return data?.startsWith(_header) ? _dosObj[data] : data;
+	}
 
 	[``, `Shadow`].forEach(pattern => {
-		const _name = `set${pattern}Color${scoreIdHeader}`;
-		const _frzName = `frz${pattern}Color${scoreIdHeader}`;
-		const _arrowInit = `set${pattern}ColorInit`;
-		const _frzInit = `frz${pattern}ColorInit`;
+		const _arrowCommon = `set${pattern}Color`;
+		const _frzCommon = `frz${pattern}Color`;
 
-		const arrowColorTxt = _dosObj[_name] || _dosObj[`set${pattern}Color`];
-		const frzColorTxt = _dosObj[_frzName] || _dosObj[`frz${pattern}Color`];
+		const _name = `${_arrowCommon}${scoreIdHeader}`;
+		const _frzName = `${_frzCommon}${scoreIdHeader}`;
+		const _arrowInit = `${_arrowCommon}Init`;
+		const _frzInit = `${_frzCommon}Init`;
+
+		const arrowColorTxt = getRefData(_arrowCommon, scoreIdHeader) || _dosObj[_arrowCommon];
+		const frzColorTxt = getRefData(_frzCommon, scoreIdHeader) || _dosObj[_frzCommon];
 
 		// 矢印色
 		Object.keys(_baseObj.dfColorgrdSet).forEach(type => {
@@ -3360,27 +3645,59 @@ const getGaugeSetting = (_dosObj, _name, _difLength, { scoreId = 0 } = {}) => {
 
 /**
  * キー名の取得
- * @param {string} _key 
- * @returns 
+ * @param {string} _key
  */
 const getKeyName = _key => hasVal(g_keyObj[`keyName${_key}`]) ? g_keyObj[`keyName${_key}`] : _key;
+
+/**
+ * KeyBoardEvent.code の値をCW Edition用のキーコードに変換
+ * 簡略指定ができるように、以下の記述を許容
+ * 例) KeyD -> D, ArrowDown -> Down, AltLeft -> Alt
+ * @param {string} _kCdN
+ */
+const getKeyCtrlVal = _kCdN => {
+	const convVal = Object.keys(g_kCdN).findIndex(val =>
+		[_kCdN, `Key${_kCdN}`, `Arrow${_kCdN}`].includes(g_kCdN[val]) || _kCdN === replaceStr(g_kCdN[val], g_escapeStr.keyCtrlName));
+	return convVal !== -1 ? convVal : parseInt(_kCdN, 10);
+};
 
 /**
  * 一時的な追加キーの設定
  * @param {object} _dosObj 
  */
-const keysConvert = (_dosObj, { keyExtraList = _dosObj.keyExtraList.split(`,`) } = {}) => {
+const keysConvert = (_dosObj, { keyExtraList = _dosObj.keyExtraList?.split(`,`) } = {}) => {
 
 	if (keyExtraList === undefined) {
-		return [];
+		keyExtraList = [];
+		Object.keys(_dosObj).filter(val => val.startsWith(g_keyObj.defaultProp))
+			.forEach(keyName => keyExtraList.push(keyName.slice(g_keyObj.defaultProp.length)));
+
+		if (keyExtraList.length === 0) {
+			return [];
+		}
 	}
 
 	const existParam = (_data, _paramName) => !hasVal(_data) && g_keyObj[_paramName] !== undefined;
 	const toString = _str => _str;
-	const toNumber = _num => parseInt(_num, 10);
-	const toFloat = _num => parseFloat(_num);
-	const toStringOrNumber = _str => isNaN(Number(_str)) ? _str : toNumber(_str);
-	const toSplitArray = _str => _str.split(`/`).map(n => toNumber(n));
+	const toFloat = _num => isNaN(parseFloat(_num)) ? _num : parseFloat(_num);
+	const toKeyCtrlArray = _str =>
+		makeBaseArray(_str.split(`/`).map(n => getKeyCtrlVal(n)), g_keyObj.minKeyCtrlNum, 0);
+	const toSplitArrayStr = _str => _str.split(`/`).map(n => n);
+
+	/**
+	 * キーパターン（相対パターン）をキーパターン（実際のパターン番号）に変換
+	 * 例) 12_(0) -> 12_4
+	 * それ以外の文字列が来た場合は、そのままの値を戻す
+	 * @param {string} _str
+	 */
+	const getKeyPtnName = _str => {
+		const regex = /\((\d+)\)/;
+		const checkStr = _str.match(regex);
+		if (checkStr !== null) {
+			return _str.replace(regex, (match, p) => `${parseInt(p, 10) + setIntVal(g_keyObj.dfPtnNum)}`);
+		}
+		return _str;
+	};
 
 	/**
 	 * 新キー用複合パラメータ
@@ -3402,10 +3719,14 @@ const keysConvert = (_dosObj, { keyExtraList = _dosObj.keyExtraList.split(`,`) }
 				if (existParam(tmpArray[k], `${keyheader}_${k + dfPtn}`)) {
 					continue;
 				}
-				g_keyObj[`${keyheader}_${k + dfPtn}`] = g_keyObj[`${_name}${tmpArray[k]}`] !== undefined ?
-					copyArray2d(g_keyObj[`${_name}${tmpArray[k]}`]) : tmpArray[k].split(`,`).map(n => _convFunc(n));
+				// |keyCtrl9j=Tab,7_0,Enter| -> |keyCtrl9j=Tab,S,D,F,Space,J,K,L,Enter| のように補完
+				g_keyObj[`${keyheader}_${k + dfPtn}`] =
+					tmpArray[k].split(`,`).map(n =>
+						g_keyObj[`${_name}${getKeyPtnName(n)}`] !== undefined ?
+							structuredClone(g_keyObj[`${_name}${getKeyPtnName(n)}`]) : [_convFunc(n)]
+					).flat();
 				if (baseCopyFlg) {
-					g_keyObj[`${keyheader}_${k + dfPtn}d`] = copyArray2d(g_keyObj[`${keyheader}_${k + dfPtn}`]);
+					g_keyObj[`${keyheader}_${k + dfPtn}d`] = structuredClone(g_keyObj[`${keyheader}_${k + dfPtn}`]);
 				}
 				loopFunc(k, keyheader);
 			}
@@ -3420,42 +3741,57 @@ const keysConvert = (_dosObj, { keyExtraList = _dosObj.keyExtraList.split(`,`) }
 	 * 新キー用複合パラメータ（特殊）
 	 * @param {string} _key キー数
 	 * @param {string} _name 名前
-	 * @param {object} _obj errCd エラーコード
-	 * @returns 最小パターン数
 	 */
-	const newKeyTripleParam = (_key, _name, { errCd = `` } = {}) => {
-		let tmpMinPatterns = 1;
+	const newKeyTripleParam = (_key, _name) => {
 		const keyheader = _name + _key;
 		const dfPtn = setIntVal(g_keyObj.dfPtnNum);
 
 		if (hasVal(_dosObj[keyheader])) {
-			const tmpArray = splitLF2(_dosObj[keyheader]);
-			tmpMinPatterns = tmpArray.length;
-			for (let k = 0; k < tmpMinPatterns; k++) {
-				if (existParam(tmpArray[k], `${keyheader}_${k + dfPtn}`)) {
-					continue;
+			splitLF2(_dosObj[keyheader])?.forEach((tmpParam, k) => {
+				if (existParam(tmpParam, `${keyheader}_${k + dfPtn}`)) {
+					return;
 				}
-				if (g_keyObj[`${_name}${tmpArray[k]}_0`] !== undefined) {
 
-					// 他のキーパターン (例: |shuffle8i=8_0| ) を指定した場合、該当があれば既存パターンからコピー
-					let m = 0;
-					while (g_keyObj[`${_name}${tmpArray[k]}_${m}`] !== undefined) {
-						g_keyObj[`${keyheader}_${k + dfPtn}_${m}`] = structuredClone(g_keyObj[`${_name}${tmpArray[k]}_${m}`]);
-						m++;
+				let ptnCnt = 0;
+				tmpParam.split(`/`).forEach(list => {
+
+					const keyPtn = getKeyPtnName(list);
+					if (list === ``) {
+						// 空指定の場合は一律同じグループへ割り当て
+						g_keyObj[`${keyheader}_${k + dfPtn}_${ptnCnt}`] = [...Array(g_keyObj[`${g_keyObj.defaultProp}${_key}_${k + dfPtn}`].length)].fill(0);
+
+					} else if (g_keyObj[`${_name}${keyPtn}_0`] !== undefined) {
+						// 他のキーパターン (例: |shuffle8i=8_0| ) を直接指定した場合、該当があれば既存パターンからコピー
+						// 既存パターンが複数ある場合、全てコピーする
+						let m = 0;
+						while (g_keyObj[`${_name}${keyPtn}_${m}`] !== undefined) {
+							g_keyObj[`${keyheader}_${k + dfPtn}_${ptnCnt}`] = structuredClone(g_keyObj[`${_name}${keyPtn}_${m}`]);
+							m++;
+							ptnCnt++;
+						}
+					} else {
+						// 通常の指定方法 (例: |shuffle8i=1,1,1,2,0,0,0,0/1,1,1,1,0,0,0,0| )の場合の取り込み
+						// 部分的にキーパターン指定があった場合は既存パターンを展開 (例: |shuffle9j=2,7_0_0,2|)
+						g_keyObj[`${keyheader}_${k + dfPtn}_${ptnCnt}`] =
+							makeBaseArray(list.split(`,`).map(n =>
+								g_keyObj[`${_name}${getKeyPtnName(n)}`] !== undefined ?
+									structuredClone(g_keyObj[`${_name}${getKeyPtnName(n)}`]) :
+									[isNaN(parseInt(n)) ? n : parseInt(n, 10)]
+							).flat(), g_keyObj[`${g_keyObj.defaultProp}${_key}_${k + dfPtn}`].length, 0);
+						ptnCnt++;
 					}
-				} else {
-
-					// 通常の指定方法 (例: |shuffle8i=1,1,1,2,0,0,0,0/1,1,1,1,0,0,0,0| )の場合の取り込み
-					tmpArray[k].split(`/`).forEach((list, m) =>
-						g_keyObj[`${keyheader}_${k + dfPtn}_${m}`] = list.split(`,`).map(n => parseInt(n, 10)));
-				}
+				});
 				g_keyObj[`${keyheader}_${k + dfPtn}`] = structuredClone(g_keyObj[`${keyheader}_${k + dfPtn}_0`]);
-			}
+			});
 
-		} else if (errCd !== `` && g_keyObj[`${keyheader}_0`] === undefined) {
-			makeWarningWindow(g_msgInfoObj[errCd].split(`{0}`).join(_key));
+		} else if (g_keyObj[`${keyheader}_${dfPtn}_0`] === undefined) {
+			// 特に指定が無い場合はkeyCtrlX_Yの配列長で決定
+			for (let k = 0; k < g_keyObj.minPatterns; k++) {
+				const ptnName = `${_key}_${k + dfPtn}`;
+				g_keyObj[`${_name}${ptnName}_0`] = [...Array(g_keyObj[`${g_keyObj.defaultProp}${ptnName}`].length)].fill(0);
+				g_keyObj[`${_name}${ptnName}`] = structuredClone(g_keyObj[`${_name}${ptnName}_0`]);
+			}
 		}
-		return tmpMinPatterns;
 	};
 
 	/**
@@ -3463,14 +3799,19 @@ const keysConvert = (_dosObj, { keyExtraList = _dosObj.keyExtraList.split(`,`) }
 	 * @param {string} _key キー数
 	 * @param {string} _name 名前
 	 * @param {string} _type float, number, string, boolean
+	 * @param {string} _defaultVal
 	 */
-	const newKeySingleParam = (_key, _name, _type) => {
+	const newKeySingleParam = (_key, _name, _type, _defaultVal) => {
 		const keyheader = _name + _key;
 		const dfPtn = setIntVal(g_keyObj.dfPtnNum);
 		if (_dosObj[keyheader] !== undefined) {
 			const tmps = _dosObj[keyheader].split(`$`);
 			for (let k = 0; k < tmps.length; k++) {
-				g_keyObj[`${keyheader}_${k + dfPtn}`] = setVal(g_keyObj[`${_name}${tmps[k]}`], setVal(tmps[k], ``, _type));
+				g_keyObj[`${keyheader}_${k + dfPtn}`] = setVal(g_keyObj[`${_name}${getKeyPtnName(tmps[k])}`],
+					tmps[k].indexOf(`_`) !== -1 ? _defaultVal : setVal(tmps[k], ``, _type));
+			}
+			for (let k = tmps.length; k < g_keyObj.minPatterns; k++) {
+				g_keyObj[`${keyheader}_${k + dfPtn}`] = g_keyObj[`${keyheader}_0`];
 			}
 		}
 	};
@@ -3487,39 +3828,47 @@ const keysConvert = (_dosObj, { keyExtraList = _dosObj.keyExtraList.split(`,`) }
 		const keyheader = _name + _key;
 		const dfPtn = setIntVal(g_keyObj.dfPtnNum);
 
-		if (_dosObj[keyheader] !== undefined) {
-			const tmpParams = splitLF2(_dosObj[keyheader]);
-			for (let k = 0; k < tmpParams.length; k++) {
-				const pairName = `${_pairName}${_key}_${k + dfPtn}`;
-				if (!hasVal(tmpParams[k])) {
-					continue;
-				}
-				g_keyObj[pairName] = {}
-				if (g_keyObj[`${_pairName}${tmpParams[k]}`] !== undefined) {
-					Object.assign(g_keyObj[pairName], g_keyObj[`${_pairName}${tmpParams[k]}`]);
-				} else {
-					if (_defaultName !== ``) {
-						g_keyObj[pairName][_defaultName] = [...Array(g_keyObj[`color${_key}_${k + dfPtn}`].length)].fill(_defaultVal);
-					}
-					tmpParams[k].split(`/`).forEach(pairs => {
-						const tmpParamPair = pairs.split(`::`);
-						g_keyObj[pairName][tmpParamPair[0]] = tmpParamPair[1].split(`,`).map(n => parseInt(n, 10));
-					});
-				}
+		splitLF2(_dosObj[keyheader])?.forEach((tmpParam, k) => {
+			const pairName = `${_pairName}${_key}_${k + dfPtn}`;
+			if (!hasVal(tmpParam)) {
+				return;
 			}
-		}
+			g_keyObj[pairName] = {}
+
+			// デフォルト項目がある場合は先に定義
+			if (_defaultName !== ``) {
+				g_keyObj[pairName][_defaultName] = [...Array(g_keyObj[`${g_keyObj.defaultProp}${_key}_${k + dfPtn}`].length)].fill(_defaultVal);
+			}
+			tmpParam.split(`/`).forEach(pairs => {
+				const keyPtn = getKeyPtnName(pairs);
+				if (pairs === ``) {
+				} else if (g_keyObj[`${_pairName}${keyPtn}`] !== undefined) {
+					// 他のキーパターン指定時、該当があればプロパティを全コピー
+					Object.assign(g_keyObj[pairName], g_keyObj[`${_pairName}${keyPtn}`]);
+				} else {
+					// 通常の指定方法（例：|scroll8i=Cross::1,1,1,-,-,-,1,1/Split::1,1,1,1,-,-,-,-|）から取り込み
+					// 部分的にキーパターン指定があった場合は既存パターンを展開 (例: |scroll9j=Cross::1,7_0,1|)
+					const tmpParamPair = pairs.split(`::`);
+					g_keyObj[pairName][tmpParamPair[0]] =
+						makeBaseArray(tmpParamPair[1]?.split(`,`).map(n =>
+							g_keyObj[`${_pairName}${getKeyPtnName(n)}`] !== undefined ?
+								structuredClone(g_keyObj[`${_pairName}${getKeyPtnName(n)}`][tmpParamPair[0]]) :
+								[n === `-` ? -1 : parseInt(n, 10)]
+						).flat(), g_keyObj[`${g_keyObj.defaultProp}${_key}_${k + dfPtn}`].length, _defaultVal);
+				}
+			});
+		});
 	};
 
 	// 対象キー毎に処理
 	keyExtraList.forEach(newKey => {
-		let tmpDivPtn = [];
-		let tmpMinPatterns = 1;
+		g_keyObj.minPatterns = 1;
 		g_keyObj.dfPtnNum = 0;
 
 		// キーパターンの追記 (appendX)
 		if (setBoolVal(_dosObj[`append${newKey}`])) {
 			for (let j = 0; ; j++) {
-				if (g_keyObj[`color${newKey}_${j}`] === undefined) {
+				if (g_keyObj[`${g_keyObj.defaultProp}${newKey}_${j}`] === undefined) {
 					break;
 				}
 				g_keyObj.dfPtnNum++;
@@ -3533,82 +3882,65 @@ const keysConvert = (_dosObj, { keyExtraList = _dosObj.keyExtraList.split(`,`) }
 		// キーの最小横幅 (minWidthX)
 		g_keyObj[`minWidth${newKey}`] = _dosObj[`minWidth${newKey}`] ?? g_keyObj[`minWidth${newKey}`] ?? g_keyObj.minWidthDefault;
 
-		// 矢印色パターン (colorX_Y)
-		tmpMinPatterns = newKeyTripleParam(newKey, `color`, { errCd: `E_0101` });
+		// キーコンフィグ (keyCtrlX_Y)
+		g_keyObj.minPatterns = newKeyMultiParam(newKey, `keyCtrl`, toKeyCtrlArray, { errCd: `E_0104`, baseCopyFlg: true });
 
 		// 読込変数の接頭辞 (charaX_Y)
-		tmpMinPatterns = newKeyMultiParam(newKey, `chara`, toString, { errCd: `E_0102` });
+		newKeyMultiParam(newKey, `chara`, toString);
+
+		// 矢印色パターン (colorX_Y)
+		newKeyTripleParam(newKey, `color`);
 
 		// 矢印の回転量指定、キャラクタパターン (stepRtnX_Y)
-		tmpMinPatterns = newKeyMultiParam(newKey, `stepRtn`, toStringOrNumber, { errCd: `E_0103` });
-
-		// キーコンフィグ (keyCtrlX_Y)
-		tmpMinPatterns = newKeyMultiParam(newKey, `keyCtrl`, toSplitArray, { errCd: `E_0104`, baseCopyFlg: true });
-
-		// 各キーの区切り位置 (divX_Y)
-		if (_dosObj[`div${newKey}`] !== undefined) {
-			const tmpDivs = _dosObj[`div${newKey}`].split(`$`);
-			for (let k = 0; k < tmpDivs.length; k++) {
-				tmpDivPtn = tmpDivs[k].split(`,`);
-				const ptnName = `${newKey}_${k + dfPtnNum}`;
-
-				if (setIntVal(tmpDivPtn[0], -1) !== -1) {
-					g_keyObj[`div${ptnName}`] = setIntVal(tmpDivPtn[0], g_keyObj[`chara${newKey}_0`].length);
-				} else if (g_keyObj[`div${tmpDivPtn[0]}`] !== undefined) {
-					// 既定キーパターンが指定された場合、存在すればその値を適用
-					g_keyObj[`div${ptnName}`] = g_keyObj[`div${tmpDivPtn[0]}`];
-					g_keyObj[`divMax${ptnName}`] = setIntVal(g_keyObj[`divMax${tmpDivPtn[0]}`], undefined);
-				} else if (setIntVal(g_keyObj[`div${ptnName}`], -1) !== -1) {
-					// すでに定義済みの場合はスキップ
-					continue;
-				} else if (g_keyObj[`chara${newKey}_0`] !== undefined) {
-					// 特に指定が無い場合はcharaX_Yの配列長で決定
-					g_keyObj[`div${ptnName}`] = g_keyObj[`chara${newKey}_0`].length;
-				}
-
-				// ステップゾーン位置の最終番号
-				if (tmpDivPtn.length > 1) {
-					g_keyObj[`divMax${ptnName}`] = setVal(tmpDivPtn[1], -1, C_TYP_FLOAT);
-				}
-			}
-		}
+		newKeyTripleParam(newKey, `stepRtn`);
 
 		// ステップゾーン位置 (posX_Y)
-		newKeyMultiParam(newKey, `pos`, toFloat, {
-			loopFunc: (k, keyheader) => {
-				const ptnName = `${newKey}_${k + dfPtnNum}`;
-				if (g_keyObj[`divMax${ptnName}`] === undefined || g_keyObj[`divMax${ptnName}`] === -1) {
-					const posLength = g_keyObj[`${keyheader}_${k + dfPtnNum}`].length;
-					g_keyObj[`divMax${ptnName}`] = g_keyObj[`${keyheader}_${k + dfPtnNum}`][posLength - 1] + 1;
-				}
+		newKeyMultiParam(newKey, `pos`, toFloat);
+
+		// 各キーの区切り位置 (divX_Y)
+		_dosObj[`div${newKey}`]?.split(`$`).forEach((tmpDiv, k) => {
+			const tmpDivPtn = tmpDiv.split(`,`);
+			const ptnName = `${newKey}_${k + dfPtnNum}`;
+
+			if (g_keyObj[`div${tmpDivPtn[0]}`] !== undefined) {
+				// 既定キーパターンが指定された場合、存在すればその値を適用
+				g_keyObj[`div${ptnName}`] = g_keyObj[`div${tmpDivPtn[0]}`];
+				g_keyObj[`divMax${ptnName}`] = setVal(g_keyObj[`divMax${tmpDivPtn[0]}`], undefined, C_TYP_FLOAT);
+			} else if (!hasVal(tmpDivPtn[0]) && setIntVal(g_keyObj[`div${ptnName}`], -1) !== -1) {
+				// カスタムキー側のdivXが未定義だが、すでに初期設定で定義済みの場合はスキップ
+				return;
+			} else {
+				// それ以外の場合は指定された値を適用（未指定時はその後で指定）
+				g_keyObj[`div${ptnName}`] = setVal(tmpDivPtn[0], undefined, C_TYP_NUMBER);
+				g_keyObj[`divMax${ptnName}`] = setVal(tmpDivPtn[1], undefined, C_TYP_FLOAT);
 			}
 		});
-		if (_dosObj[`pos${newKey}`] === undefined) {
-			for (let k = 0; k < tmpMinPatterns; k++) {
-				const ptnName = `${newKey}_${k + dfPtnNum}`;
-				if (g_keyObj[`color${ptnName}`] !== undefined) {
-					g_keyObj[`pos${ptnName}`] = [...Array(g_keyObj[`color${ptnName}`].length).keys()].map(i => i);
-				}
-			}
+
+		// charaX_Y, posX_Y, keyGroupX_Y, divX_Y, divMaxX_Yが未指定の場合はkeyCtrlX_Yを元に適用
+		for (let k = 0; k < g_keyObj.minPatterns; k++) {
+			setKeyDfVal(`${newKey}_${k + dfPtnNum}`);
 		}
 
 		// ステップゾーン間隔 (blankX_Y)
-		newKeySingleParam(newKey, `blank`, C_TYP_FLOAT);
+		newKeySingleParam(newKey, `blank`, C_TYP_FLOAT, g_keyObj.blank_def);
 
 		// 矢印群の倍率 (scaleX_Y)
-		newKeySingleParam(newKey, `scale`, C_TYP_FLOAT);
+		newKeySingleParam(newKey, `scale`, C_TYP_FLOAT, g_keyObj.scale_def);
 
 		// プレイ中ショートカット：リトライ (keyRetryX_Y)
-		newKeySingleParam(newKey, `keyRetry`, C_TYP_NUMBER);
+		newKeySingleParam(newKey, `keyRetry`, C_TYP_STRING, C_KEY_RETRY);
 
 		// プレイ中ショートカット：タイトルバック (keyTitleBackX_Y)
-		newKeySingleParam(newKey, `keyTitleBack`, C_TYP_NUMBER);
+		newKeySingleParam(newKey, `keyTitleBack`, C_TYP_STRING, C_KEY_TITLEBACK);
 
 		// 別キーフラグ (transKeyX_Y)
-		newKeySingleParam(newKey, `transKey`, C_TYP_STRING);
+		newKeySingleParam(newKey, `transKey`, C_TYP_STRING, ``);
 
 		// シャッフルグループ (shuffleX_Y)
 		newKeyTripleParam(newKey, `shuffle`);
+
+		// キーグループ (keyGroupX_Y)
+		newKeyMultiParam(newKey, `keyGroup`, toSplitArrayStr);
 
 		// スクロールパターン (scrollX_Y)
 		// |scroll(newKey)=Cross::1,1,-1,-1,-1,1,1/Split::1,1,1,-1,-1,-1,-1$...|
@@ -3617,9 +3949,31 @@ const keysConvert = (_dosObj, { keyExtraList = _dosObj.keyExtraList.split(`,`) }
 		// アシストパターン (assistX_Y)
 		// |assist(newKey)=Onigiri::0,0,0,0,0,1/AA::0,0,0,1,1,1$...|
 		newKeyPairParam(newKey, `assist`, `assistPos`);
+
+		// keyRetry, keyTitleBackのキー名をキーコードに変換
+		const keyTypePatterns = Object.keys(g_keyObj).filter(val => val.startsWith(`keyRetry${newKey}`) || val.startsWith(`keyTitleBack${newKey}`));
+		keyTypePatterns.forEach(name => g_keyObj[name] = getKeyCtrlVal(g_keyObj[name]));
 	});
 
 	return keyExtraList;
+};
+
+/**
+ * キーパターンのデフォルト値設定
+ * @param {string} _ptnName 
+ */
+const setKeyDfVal = _ptnName => {
+	const baseLength = g_keyObj[`${g_keyObj.defaultProp}${_ptnName}`].length;
+	g_keyObj[`chara${_ptnName}`] = padArray(g_keyObj[`chara${_ptnName}`], [...Array(baseLength).keys()].map(i => `${i + 1}a`));
+	g_keyObj[`pos${_ptnName}`] = padArray(g_keyObj[`pos${_ptnName}`], [...Array(baseLength).keys()].map(i => i));
+	g_keyObj[`keyGroup${_ptnName}`] = padArray(g_keyObj[`keyGroup${_ptnName}`], [...Array(baseLength)].fill([`0`]));
+
+	if (g_keyObj[`div${_ptnName}`] === undefined) {
+		g_keyObj[`div${_ptnName}`] = Math.max(...g_keyObj[`pos${_ptnName}`]) + 1;
+	}
+	if (g_keyObj[`divMax${_ptnName}`] === undefined) {
+		g_keyObj[`divMax${_ptnName}`] = Math.max(...g_keyObj[`pos${_ptnName}`]) + 1;
+	}
 };
 
 /*-----------------------------------------------------------*/
@@ -3636,12 +3990,12 @@ const titleInit = _ => {
 
 	// タイトル用フレーム初期化
 	g_scoreObj.titleFrameNum = 0;
-	g_scoreObj.backTitleFrameNum = 0;
-	g_scoreObj.maskTitleFrameNum = 0;
 
-	// タイトル用ループカウンター
-	g_scoreObj.backTitleLoopCount = 0;
-	g_scoreObj.maskTitleLoopCount = 0;
+	// タイトルアニメーション用フレーム初期化、ループカウンター設定
+	g_animationData.forEach(sprite => {
+		g_scoreObj[`${sprite}TitleFrameNum`] = 0;
+		g_scoreObj[`${sprite}TitleLoopCount`] = 0;
+	});
 
 	const keyCtrlPtn = `${g_keyObj.currentKey}_${g_keyObj.currentPtn}`;
 
@@ -3711,7 +4065,7 @@ const titleInit = _ => {
 		// 変数 titlelineheight の定義 (使用例： |titlelineheight=50|)
 		const titlelineheight = (g_headerObj.titlelineheight !== `` ? g_headerObj.titlelineheight - (titlefontsize2 + 10) : 0);
 
-		let txtAnimations = [``, ``];
+		const txtAnimations = [``, ``];
 		if (!g_headerObj.customTitleAnimationUse) {
 			for (let j = 0; j < txtAnimations.length; j++) {
 				txtAnimations[j] = `animation-name:${g_headerObj.titleAnimationName[j]};
@@ -3770,17 +4124,16 @@ const titleInit = _ => {
 		customVersion += ` / ${g_localVersion2}`;
 	}
 	const releaseDate = (g_headerObj.releaseDate !== `` ? ` @${g_headerObj.releaseDate}` : ``);
-	const versionName = `&copy; 2018-${g_revisedDate.slice(0, 4)} ティックル, CW ${g_version}${g_alphaVersion}${customVersion}${releaseDate}`;
+	const versionName = `&copy; 2018-${g_revisedDate.slice(0, 4)} ティックル, CW ${g_version}${customVersion}${releaseDate}`;
 
 	let reloadFlg = false;
-	const getLinkSiz = _name => getFontSize(_name, g_sWidth / 2 - 20, getBasicFont(), C_LBL_LNKSIZE, 12);
+	const getLinkSiz = _name => getFontSize(_name, g_sWidth / 2 - 20, getBasicFont(), g_limitObj.lnkSiz, 12);
 
 	/**
 	 * クレジット用リンク作成
 	 * @param {string} _id 
 	 * @param {string} _text 
 	 * @param {string} _url 
-	 * @returns 
 	 */
 	const createCreditBtn = (_id, _text, _url) =>
 		createCss2Button(_id, _text, _ => true,
@@ -3791,7 +4144,7 @@ const titleInit = _ => {
 
 		// Click Here
 		createCss2Button(`btnStart`, g_lblNameObj.clickHere, _ => clearTimeout(g_timeoutEvtTitleId), {
-			w: g_sWidth, siz: C_LBL_TITLESIZE, resetFunc: _ => optionInit(),
+			w: g_sWidth, siz: g_limitObj.titleSiz, resetFunc: _ => optionInit(),
 		}, g_cssObj.button_Start),
 
 		// Reset
@@ -3855,13 +4208,7 @@ const titleInit = _ => {
 	if (g_headerObj.commentVal !== ``) {
 
 		// コメント文の加工
-		const comments = g_headerObj.commentVal.split(`}`).join(`{`).split(`{`);
-		let convCommentVal = ``;
-		for (let j = 0; j < comments.length; j += 2) {
-			convCommentVal += escapeHtmlForEnabledTag(comments[j]);
-			convCommentVal += setVal(comments[j + 1], ``, C_TYP_CALC);
-		}
-
+		const convCommentVal = convertStrToVal(g_headerObj.commentVal);
 		if (g_headerObj.commentExternal) {
 			if (document.querySelector(`#commentArea`) !== null) {
 				commentArea.innerHTML = convCommentVal;
@@ -3892,19 +4239,18 @@ const titleInit = _ => {
 		// ユーザカスタムイベント(フレーム毎)
 		g_customJsObj.titleEnterFrame.forEach(func => func());
 
-		// 背景・マスクモーション
+		// 背景・マスクモーション、スキン変更
 		drawTitleResultMotion(g_currentPage);
 
 		thisTime = performance.now();
 		buffTime = thisTime - titleStartTime - g_scoreObj.titleFrameNum * 1000 / g_fps;
 
 		g_scoreObj.titleFrameNum++;
-		g_scoreObj.backTitleFrameNum++;
-		g_scoreObj.maskTitleFrameNum++;
-		g_timeoutEvtTitleId = setTimeout(_ => flowTitleTimeline(), 1000 / g_fps - buffTime);
+		g_animationData.forEach(sprite => g_scoreObj[`${sprite}TitleFrameNum`]++);
+		g_timeoutEvtTitleId = setTimeout(flowTitleTimeline, 1000 / g_fps - buffTime);
 	};
 
-	g_timeoutEvtTitleId = setTimeout(_ => flowTitleTimeline(), 1000 / g_fps);
+	g_timeoutEvtTitleId = setTimeout(flowTitleTimeline, 1000 / g_fps);
 
 	// キー操作イベント（デフォルト）
 	setShortcutEvent(g_currentPage, _ => true, { dfEvtFlg: true });
@@ -3971,7 +4317,7 @@ const setWindowStyle = (_text, _bkColor, _textColor, _align = C_ALIGN_LEFT) => {
 
 	// ウィンドウ枠の行を取得するために一時的な枠を作成
 	const tmplbl = createDivCss2Label(`lblTmpWarning`, _text, {
-		x: 0, y: 70, w: g_sWidth, h: 20, siz: C_SIZ_MAIN, lineHeight: `15px`, fontFamily: getBasicFont(),
+		x: 0, y: 70, w: g_sWidth, h: 20, siz: g_limitObj.mainSiz, lineHeight: `15px`, fontFamily: getBasicFont(),
 		whiteSpace: `normal`,
 	});
 	divRoot.appendChild(tmplbl);
@@ -3982,7 +4328,7 @@ const setWindowStyle = (_text, _bkColor, _textColor, _align = C_ALIGN_LEFT) => {
 	const warnHeight = Math.min(150, Math.max(range.getClientRects().length,
 		_text.split(`<br>`).length + _text.split(`<p>`).length - 1) * 21);
 	const lbl = createDivCss2Label(`lblWarning`, _text, {
-		x: 0, y: 70, w: g_sWidth, h: warnHeight, siz: C_SIZ_MAIN, backgroundColor: _bkColor,
+		x: 0, y: 70, w: g_sWidth, h: warnHeight, siz: g_limitObj.mainSiz, backgroundColor: _bkColor,
 		opacity: 0.9, lineHeight: `15px`, color: _textColor, align: _align, fontFamily: getBasicFont(),
 		whiteSpace: `normal`,
 	});
@@ -4088,10 +4434,10 @@ const optionInit = _ => {
 const setSpriteList = _settingList => {
 	const optionWidth = (g_sWidth - 450) / 2;
 	const spriteList = [];
-	_settingList.forEach(setting =>
-		spriteList[setting[0]] = createEmptySprite(optionsprite, `${setting[0]}Sprite`, {
-			x: 25, y: setting[1] * C_LEN_SETLBL_HEIGHT + setting[2] + 20,
-			w: optionWidth + setting[3], h: C_LEN_SETLBL_HEIGHT + setting[4],
+	Object.keys(_settingList).forEach(setting =>
+		spriteList[setting] = createEmptySprite(optionsprite, `${setting}Sprite`, {
+			x: 25, y: _settingList[setting].heightPos * g_limitObj.setLblHeight + _settingList[setting].y + 20,
+			w: optionWidth + _settingList[setting].dw, h: g_limitObj.setLblHeight + _settingList[setting].dh,
 		}));
 	return spriteList;
 };
@@ -4099,7 +4445,6 @@ const setSpriteList = _settingList => {
 /**
  * 設定ウィンドウの作成
  * @param {string} _sprite 
- * @returns 
  */
 const createOptionSprite = _sprite => createEmptySprite(_sprite, `optionsprite`, g_windowObj.optionSprite);
 
@@ -4107,12 +4452,621 @@ const createOptionSprite = _sprite => createEmptySprite(_sprite, `optionsprite`,
  * スライダー共通処理
  * @param {object} _slider 
  * @param {object} _link 
- * @returns 
  */
 const inputSlider = (_slider, _link) => {
 	const value = parseInt(_slider.value);
 	_link.textContent = `${value}${g_lblNameObj.percent}`;
 	return value;
+};
+
+/**
+ * 譜面変更セレクターの削除
+ */
+const resetDifWindow = _ => {
+	if (document.querySelector(`#difList`) !== null) {
+		deleteChildspriteAll(`difList`);
+		[`difList`, `difCover`, `btnDifU`, `btnDifD`].forEach(obj => optionsprite.removeChild(document.getElementById(obj)));
+		g_currentPage = `option`;
+		setShortcutEvent(g_currentPage, _ => true, { displayFlg: false, dfEvtFlg: true });
+	}
+};
+
+/**
+ * 次の譜面番号を取得 
+ * @param {number} _scoreId 
+ * @param {number} _scrollNum 
+ */
+const getNextDifficulty = (_scoreId, _scrollNum) => {
+	const currentPosIdx = g_headerObj.viewLists.findIndex(val => val === _scoreId);
+	const nextPosIdx = (currentPosIdx === -1 ? 0 : nextPos(currentPosIdx, _scrollNum, g_headerObj.viewLists.length));
+	return g_headerObj.viewLists[nextPosIdx];
+};
+
+/**
+ * 譜面選択処理
+ * @param {number} _scrollNum 
+ */
+const nextDifficulty = (_scrollNum = 1) => {
+	g_keyObj.prevKey = g_headerObj.keyLabels[g_stateObj.scoreId];
+	g_stateObj.scoreId = getNextDifficulty(g_stateObj.scoreId, _scrollNum);
+	setDifficulty(true);
+	resetDifWindow();
+};
+
+/**
+ * 譜面リストの作成
+ * @param {object} _difList 
+ * @param {string} _targetKey 
+ */
+const makeDifList = (_difList, _targetKey = ``) => {
+	let k = 0;
+	let pos = 0;
+	g_headerObj.viewLists.forEach(j => {
+		const keyLabel = g_headerObj.keyLabels[j];
+		if (_targetKey === `` || keyLabel === _targetKey) {
+			let text = `${getKeyName(keyLabel)} / ${g_headerObj.difLabels[j]}`;
+			if (g_headerObj.makerView) {
+				text += ` (${g_headerObj.creatorNames[j]})`;
+			}
+			_difList.appendChild(makeDifLblCssButton(`dif${k}`, text, k, _ => {
+				nextDifficulty(j - g_stateObj.scoreId);
+			}, { btnStyle: (j === g_stateObj.scoreId ? `Setting` : `Default`) }));
+			if (j === g_stateObj.scoreId) {
+				pos = k + 6;
+			}
+			k++;
+		}
+	});
+	_difList.scrollTop = Math.max(pos * g_limitObj.setLblHeight - parseInt(_difList.style.height), 0);
+};
+
+/**
+ * 譜面セレクター位置の変更ボタン
+ * @param {number} _scrollNum 
+ */
+const makeDifBtn = (_scrollNum = 1) => {
+	const dir = _scrollNum === 1 ? `D` : `U`;
+	return createCss2Button(`btnDif${dir}`, g_settingBtnObj.chara[dir], _ => {
+		do {
+			g_stateObj.scoreId = getNextDifficulty(g_stateObj.scoreId, _scrollNum);
+		} while (g_stateObj.filterKeys !== `` && g_stateObj.filterKeys !== g_headerObj.keyLabels[g_stateObj.scoreId]);
+		setDifficulty(true);
+		deleteChildspriteAll(`difList`);
+		makeDifList(difList, g_stateObj.filterKeys);
+		g_keyObj.prevKey = g_keyObj.currentKey;
+	}, {
+		x: 430 + _scrollNum * 10, y: 40, w: 20, h: 20, siz: g_limitObj.jdgCntsSiz,
+	}, g_cssObj.button_Mini);
+};
+
+/**
+ * 譜面変更セレクターの作成・再作成
+ * @param {string} _key
+ */
+const createDifWindow = (_key = ``) => {
+	g_currentPage = `difSelector`;
+	setShortcutEvent(g_currentPage);
+	const difList = createEmptySprite(optionsprite, `difList`, g_windowObj.difList, g_cssObj.settings_DifSelector);
+	const difCover = createEmptySprite(optionsprite, `difCover`, g_windowObj.difCover, g_cssObj.settings_DifSelector);
+
+	// リスト再作成
+	makeDifList(difList, _key);
+
+	// ランダム選択
+	difCover.appendChild(
+		makeDifLblCssButton(`difRandom`, `RANDOM`, 0, _ => {
+			nextDifficulty(Math.floor(Math.random() * g_headerObj.keyLabels.length));
+		}, { w: g_limitObj.difCoverWidth })
+	);
+
+	// 全リスト
+	difCover.appendChild(
+		makeDifLblCssButton(`keyFilter`, `ALL`, 1.5, _ => {
+			resetDifWindow();
+			g_stateObj.filterKeys = ``;
+			createDifWindow();
+		}, { w: g_limitObj.difCoverWidth, btnStyle: (g_stateObj.filterKeys === `` ? `Setting` : `Default`) })
+	);
+
+	// キー別フィルタボタン作成
+	let pos = 0;
+	g_headerObj.viewKeyLists.forEach((targetKey, m) => {
+		difCover.appendChild(
+			makeDifLblCssButton(`keyFilter${m}`, `${getKeyName(targetKey)} ${getStgDetailName('key')}`, m + 2.5, _ => {
+				resetDifWindow();
+				g_stateObj.filterKeys = targetKey;
+				createDifWindow(targetKey);
+			}, { w: g_limitObj.difCoverWidth, btnStyle: (g_stateObj.filterKeys === targetKey ? `Setting` : `Default`) })
+		);
+		if (g_stateObj.filterKeys === targetKey) {
+			pos = m + 9;
+		}
+	});
+	difCover.scrollTop = Math.max(pos * g_limitObj.setLblHeight - parseInt(difCover.style.height), 0);
+
+	multiAppend(optionsprite, makeDifBtn(-1), makeDifBtn());
+};
+
+const changeDifficulty = (_num = 1) => {
+	if (g_headerObj.difSelectorUse) {
+		g_stateObj.filterKeys = ``;
+		if (document.querySelector(`#difList`) === null) {
+			g_keyObj.prevKey = g_keyObj.currentKey;
+			createDifWindow();
+		} else {
+			resetDifWindow();
+		}
+	} else {
+		nextDifficulty(_num);
+	}
+};
+
+/**
+ * 譜面基礎データの取得
+ * @param {number} _scoreId 
+ */
+const getScoreBaseData = _scoreId => {
+	const arrowCnts = sumData(g_detailObj.arrowCnt[_scoreId]);
+	const frzCnts = sumData(g_detailObj.frzCnt[_scoreId]);
+	return {
+		arrowCnts: arrowCnts,
+		frzCnts: frzCnts,
+		apm: Math.round((arrowCnts + frzCnts) / (g_detailObj.playingFrame[_scoreId] / g_fps / 60)),
+		playingTime: transFrameToTimer(g_detailObj.playingFrame[_scoreId]),
+	};
+};
+
+/**
+ * 速度変化グラフの描画
+ * @param {number} _scoreId
+ */
+const drawSpeedGraph = _scoreId => {
+	const startFrame = g_detailObj.startFrame[_scoreId];
+	const playingFrame = g_detailObj.playingFrameWithBlank[_scoreId];
+	const speedObj = {
+		speed: { frame: [0], speed: [1], cnt: 0, strokeColor: g_graphColorObj.speed },
+		boost: { frame: [0], speed: [1], cnt: 0, strokeColor: g_graphColorObj.boost }
+	};
+
+	Object.keys(speedObj).forEach(speedType => {
+		const frame = speedObj[speedType].frame;
+		const speed = speedObj[speedType].speed;
+		const speedData = g_detailObj[`${speedType}Data`][_scoreId];
+
+		if (speedData !== undefined) {
+			for (let i = 0; i < speedData.length; i += 2) {
+				if (speedData[i] >= startFrame) {
+					frame.push(speedData[i] - startFrame);
+					speed.push(speedData[i + 1]);
+				}
+				speedObj[speedType].cnt++;
+			}
+			frame.push(playingFrame);
+			speed.push(speed[speed.length - 1]);
+		}
+	});
+
+	const canvas = document.querySelector(`#graphSpeed`);
+	const context = canvas.getContext(`2d`);
+	drawBaseLine(context);
+
+	const avgX = [0, 0];
+	const avgSubX = [1, 1];
+	const lineX = [125, 210];
+	Object.keys(speedObj).forEach((speedType, j) => {
+		context.beginPath();
+		let preY;
+		let avgSubFrame = playingFrame;
+
+		for (let i = 0; i < speedObj[speedType].frame.length; i++) {
+			const x = speedObj[speedType].frame[i] * (g_limitObj.graphWidth - 30) / playingFrame + 30;
+			const y = (speedObj[speedType].speed[i] - 1) * -90 + 105;
+
+			context.lineTo(x, preY);
+			context.lineTo(x, y);
+			preY = y;
+
+			const deltaFrame = speedObj[speedType].frame[i] - (speedObj[speedType].frame[i - 1] ?? startFrame);
+			avgX[j] += deltaFrame * (speedObj[speedType].speed[i - 1] ?? 1);
+			if ((speedObj[speedType].speed[i - 1] ?? 1) === 1) {
+				avgSubFrame -= deltaFrame;
+			} else {
+				avgSubX[j] += deltaFrame * (speedObj[speedType].speed[i - 1]);
+			}
+		}
+		avgX[j] /= playingFrame;
+		avgSubX[j] /= Math.max(avgSubFrame, 1);
+
+		context.lineWidth = 1;
+		context.strokeStyle = speedObj[speedType].strokeColor;
+		context.stroke();
+
+		context.beginPath();
+		context.moveTo(lineX[j], 215);
+		context.lineTo(lineX[j] + 25, 215);
+		context.stroke();
+		context.font = `${g_limitObj.difSelectorSiz}px ${getBasicFont()}`;
+		context.fillText(g_lblNameObj[`s_${speedType}`], lineX[j] + 30, 218);
+
+		updateScoreDetailLabel(`Speed`, `${speedType}S`, speedObj[speedType].cnt, j, g_lblNameObj[`s_${speedType}`]);
+		updateScoreDetailLabel(`Speed`, `avgD${speedType}`, avgSubX[j] === 1 ? `----` : `${(avgSubX[j]).toFixed(2)}x`, j + 4, g_lblNameObj[`s_avgD${speedType}`]);
+	});
+	updateScoreDetailLabel(`Speed`, `avgS`, `${(avgX[0] * avgX[1]).toFixed(2)}x`, 2, g_lblNameObj.s_avg);
+};
+
+/**
+ * 譜面密度グラフの描画
+ * @param {number} _scoreId 
+ */
+const drawDensityGraph = _scoreId => {
+
+	const canvas = document.querySelector(`#graphDensity`);
+	const context = canvas.getContext(`2d`);
+	drawBaseLine(context);
+	for (let j = 0; j < g_limitObj.densityDivision; j++) {
+		context.beginPath();
+		[``, `2Push`, `3Push`].forEach(val => {
+			context.fillStyle = (g_detailObj.maxDensity[_scoreId].includes(j) ? g_graphColorObj[`max${val}`] : g_graphColorObj[`default${val}`]);
+			context.fillRect(16 * j * 16 / g_limitObj.densityDivision + 30, 195 - 9 * g_detailObj[`density${val}Data`][_scoreId][j] / 10,
+				15.5 * 16 / g_limitObj.densityDivision, 9 * g_detailObj[`density${val}Diff`][_scoreId][j] / 10
+			);
+		});
+		context.stroke();
+	}
+
+	const lineNames = [`Single`, `Chord`, `Triad+`];
+	Object.keys(g_graphColorObj).filter(val => val.indexOf(`max`) !== -1).forEach((val, j) => {
+		const lineX = 70 + j * 70;
+
+		context.beginPath();
+		context.lineWidth = 3;
+		context.fillStyle = g_rankObj.rankColorAllPerfect;
+		context.strokeStyle = g_graphColorObj[val];
+		context.moveTo(lineX, 215);
+		context.lineTo(lineX + 20, 215);
+		context.stroke();
+		context.font = `${g_limitObj.difSelectorSiz}px ${getBasicFont()}`;
+		context.fillText(lineNames[j], lineX + 20, 218);
+	});
+
+	const obj = getScoreBaseData(_scoreId);
+	updateScoreDetailLabel(`Density`, `APM`, obj.apm, 0, g_lblNameObj.s_apm);
+	updateScoreDetailLabel(`Density`, `Time`, obj.playingTime, 1, g_lblNameObj.s_time);
+	updateScoreDetailLabel(`Density`, `Arrow`, obj.arrowCnts, 3, g_lblNameObj.s_arrow);
+	updateScoreDetailLabel(`Density`, `Frz`, obj.frzCnts, 4, `${g_lblNameObj.s_frz}${g_headerObj.frzStartjdgUse ? ' <span class="common_bold">(2x)</span>' : ''}`);
+};
+
+/**
+ * 譜面明細内の補足情報の登録・更新
+ * @param {string} _name 表示する譜面明細のラベル
+ * @param {string} _label 
+ * @param {string} _value 
+ * @param {number} _pos 表示位置
+ * @param {string} _labelname
+ */
+const updateScoreDetailLabel = (_name, _label, _value, _pos = 0, _labelname = _label) => {
+	const baseLabel = (_bLabel, _bLabelname, _bAlign) =>
+		document.querySelector(`#detail${_name}`).appendChild(
+			createDivCss2Label(`${_bLabel}`, `${_bLabelname}`, {
+				x: 10, y: 105 + _pos * 20, w: 100, h: 20, siz: g_limitObj.difSelectorSiz, align: _bAlign,
+			})
+		);
+	if (document.querySelector(`#data${_label}`) === null) {
+		baseLabel(`lbl${_label}`, `${_labelname}`, C_ALIGN_LEFT);
+		baseLabel(`data${_label}`, `${_value}`, C_ALIGN_RIGHT);
+	} else {
+		document.querySelector(`#data${_label}`).textContent = `${_value}`;
+	}
+};
+
+/**
+ * グラフの縦軸を描画
+ * @param {object} _context 
+ * @param {number} _resolution 
+ */
+const drawBaseLine = (_context, _resolution = 10) => {
+	_context.clearRect(0, 0, g_limitObj.graphWidth, g_limitObj.graphHeight);
+
+	for (let j = 0; j <= 2 * _resolution; j += 5) {
+		drawLine(_context, j / _resolution, `main`, 2);
+		for (let k = 1; k < 5; k++) {
+			drawLine(_context, (j + k) / _resolution, `sub`, 2);
+		}
+	}
+};
+
+/**
+ * グラフ上に目盛を表示
+ * @param {object} _context 
+ * @param {number} _y 
+ * @param {string} _lineType 
+ * @param {number} _fixed
+ */
+const drawLine = (_context, _y, _lineType, _fixed = 0) => {
+	const lineY = (_y - 1) * -90 + 105;
+	_context.beginPath();
+	_context.moveTo(30, lineY);
+	_context.lineTo(g_limitObj.graphWidth, lineY);
+	_context.lineWidth = 1;
+
+	if (_lineType === `main`) {
+		const textBaseObj = document.querySelector(`#lnkDifficulty`);
+		const textColor = window.getComputedStyle(textBaseObj, ``).color;
+		_context.strokeStyle = textColor;
+		_context.font = `12px ${getBasicFont()}`;
+		_context.fillStyle = textColor;
+		_context.fillText(_y.toFixed(_fixed), 0, lineY + 4);
+	} else {
+		_context.strokeStyle = `#646464`;
+	}
+	_context.stroke();
+};
+
+/**
+ * 譜面の難易度情報用ラベル作成
+ * @param {number} _scoreId 
+ */
+const makeDifInfoLabels = _scoreId => {
+
+	// ツール難易度
+	const detailToolDif = document.querySelector(`#detailToolDif`);
+	/**
+	 * 譜面の難易度情報ラベルの作成
+	 * @param {string} _lbl 
+	 * @param {string} _data 
+	 * @param {object} _obj 
+	 */
+	const makeDifInfoLabel = (_lbl, _data, { x = 130, y = 25, w = 125, h = 35, siz = g_limitObj.difSelectorSiz, ...rest } = {}) =>
+		createDivCss2Label(_lbl, _data, { x, y, w, h, siz, align: C_ALIGN_LEFT, ...rest });
+
+	let printData = ``;
+	for (let j = 0; j < g_detailObj.arrowCnt.length; j++) {
+		const obj = getScoreBaseData(j);
+		printData +=
+			// 譜面番号
+			`[${j + 1}]\t` +
+			// ツール値
+			`${g_detailObj.toolDif[j].tool}\t` +
+			// 同時
+			`${g_detailObj.toolDif[j].douji}\t` +
+			// 縦連
+			`${g_detailObj.toolDif[j].tate}\t` +
+			// 総矢印数
+			`${(obj.arrowCnts + obj.frzCnts)}\t` +
+			// 矢印
+			`${obj.arrowCnts}\t` +
+			// フリーズアロー
+			`${obj.frzCnts}\t` +
+			// APM
+			`${obj.apm}\t` +
+			// 時間(分秒)
+			`${obj.playingTime}\r\n`;
+	}
+	multiAppend(detailToolDif,
+		makeDifInfoLabel(`lblTooldif`, g_lblNameObj.s_level, g_lblPosObj.lblTooldif),
+		makeDifInfoLabel(`dataTooldif`, ``, g_lblPosObj.dataTooldif),
+		makeDifInfoLabel(`lblDouji`, g_lblNameObj.s_douji, g_lblPosObj.lblDouji),
+		makeDifInfoLabel(`lblTate`, g_lblNameObj.s_tate, g_lblPosObj.lblTate),
+		makeDifInfoLabel(`dataDouji`, ``, g_lblPosObj.dataDouji),
+		makeDifInfoLabel(`dataTate`, ``, g_lblPosObj.dataTate),
+		makeDifInfoLabel(`lblArrowInfo`, g_lblNameObj.s_cnts, g_lblPosObj.lblArrowInfo),
+		makeDifInfoLabel(`dataArrowInfo`, ``, g_lblPosObj.dataArrowInfo),
+		makeDifInfoLabel(`lblArrowInfo2`, ``, g_lblPosObj.lblArrowInfo2),
+		makeDifInfoLabel(`dataArrowInfo2`, ``, g_lblPosObj.dataArrowInfo2),
+		makeDifLblCssButton(`lnkDifInfo`, g_lblNameObj.s_print, 8, _ => {
+			copyTextToClipboard(
+				`****** ${g_lblNameObj.s_printTitle} [${g_version}] ******\r\n\r\n`
+				+ `\t${g_lblNameObj.s_printHeader}\r\n\r\n${printData}`, g_msgInfoObj.I_0003
+			);
+		}, g_lblPosObj.lnkDifInfo),
+	);
+	createScText(lnkDifInfo, `DifInfo`, { targetLabel: `lnkDifInfo`, x: -10 });
+};
+
+/**
+ * 譜面の難易度情報更新
+ * @param {number} _scoreId 
+ */
+const makeDifInfo = _scoreId => {
+
+	const arrowCnts = sumData(g_detailObj.arrowCnt[_scoreId]);
+	const frzCnts = sumData(g_detailObj.frzCnt[_scoreId]);
+	const push3CntStr = (g_detailObj.toolDif[_scoreId].push3.length === 0 ? `None` : `(${g_detailObj.toolDif[_scoreId].push3})`);
+
+	if (document.querySelector(`#lblTooldif`) === null) {
+		makeDifInfoLabels(_scoreId);
+	}
+	dataTooldif.textContent = g_detailObj.toolDif[_scoreId].tool;
+	dataDouji.textContent = g_detailObj.toolDif[_scoreId].douji;
+	dataTate.textContent = g_detailObj.toolDif[_scoreId].tate;
+	lblArrowInfo2.innerHTML = g_lblNameObj.s_linecnts.split(`{0}`).join(g_detailObj.toolDif[_scoreId].push3cnt);
+	dataArrowInfo.innerHTML = `${arrowCnts + frzCnts * (g_headerObj.frzStartjdgUse ? 2 : 1)} 
+	<span style="font-size:${g_limitObj.difSelectorSiz}px;">(${arrowCnts} + ${frzCnts}${g_headerObj.frzStartjdgUse ? ' <span class="common_bold">x 2</span>' : ''})</span>`;
+	dataArrowInfo2.innerHTML = `<br>(${g_detailObj.arrowCnt[_scoreId]})<br><br>
+			(${g_detailObj.frzCnt[_scoreId]})<br><br>
+			${push3CntStr}`.split(`,`).join(`/`);
+};
+
+/**
+ * 譜面初期化処理
+ * - 譜面の基本設定（キー数、初期速度、リバース、ゲージ設定）をここで行う
+ * - g_canLoadDifInfoFlg は譜面初期化フラグで、初期化したくない場合は対象画面にて false にしておく
+ *   (Display設定画面、キーコンフィグ画面では通常OFF)
+ *   この関数を実行後、このフラグはONに戻るようになっている 
+ * - [キーコン]->[初期化]->[名称設定]の順に配置する。
+ *   初期化処理にてキー数関連の設定を行っているため、この順序で無いとデータが正しく格納されない
+ */
+const setDifficulty = (_initFlg) => {
+
+	// ---------------------------------------------------
+	// 1. キーコンフィグ設定 (KeyConfig)
+	g_keyObj.currentKey = g_headerObj.keyLabels[g_stateObj.scoreId];
+	const isNotSameKey = (g_keyObj.prevKey !== g_keyObj.currentKey);
+
+	if (g_headerObj.dummyScoreNos !== undefined) {
+		g_stateObj.dummyId = setIntVal(g_headerObj.dummyScoreNos[g_stateObj.scoreId], ``);
+	}
+	// 特殊キーフラグ
+	g_stateObj.extraKeyFlg = g_headerObj.keyExtraList.includes(g_keyObj.currentKey);
+
+	// ---------------------------------------------------
+	// 2. 初期化設定
+
+	// 保存した設定の再読込条件（設定画面切り替え時はスキップ）
+	// ローカルストレージで保存した設定を呼び出し
+	if ((g_canLoadDifInfoFlg && (isNotSameKey && g_stateObj.dataSaveFlg)) || _initFlg) {
+
+		if (isNotSameKey && g_keyObj.prevKey !== `Dummy`) {
+			// キーパターン初期化
+			g_keyObj.currentPtn = 0;
+			g_keycons.keySwitchNum = 0;
+		}
+		const hasKeyStorage = localStorage.getItem(`danonicw-${g_keyObj.currentKey}k`);
+		let storageObj, addKey = ``;
+
+		if (!g_stateObj.extraKeyFlg) {
+
+			// キー別のローカルストレージの初期設定　※特殊キーは除く
+			g_localKeyStorage = hasKeyStorage ? JSON.parse(hasKeyStorage) : {
+				reverse: C_FLG_OFF,
+				keyCtrl: [[]],
+				keyCtrlPtn: 0,
+				setColor: [],
+			};
+			storageObj = g_localKeyStorage;
+
+		} else {
+			storageObj = g_localStorage;
+			addKey = g_keyObj.currentKey;
+		}
+		if (isNotSameKey) {
+			getKeyReverse(storageObj, addKey);
+
+			// キーコンフィグ初期値設定
+			if (storageObj[`keyCtrlPtn${addKey}`] === undefined) {
+				storageObj[`keyCtrlPtn${addKey}`] = 0;
+			}
+			getKeyCtrl(storageObj, addKey);
+
+			// カラーセット初期値設定
+			if (storageObj[`setColor${addKey}`] === undefined) {
+				storageObj[`setColor${addKey}`] = [];
+			}
+			if (storageObj[`setColor${addKey}`].length > 0) {
+				g_keycons.colorTypes = addValtoArray(g_keycons.colorTypes, g_keycons.colorSelf);
+				resetColorType({ _fromObj: storageObj, _from: addKey, _to: g_keycons.colorSelf });
+				resetColorType({ _fromObj: storageObj, _from: addKey, _toObj: g_dfColorObj, _to: g_keycons.colorSelf });
+
+			} else {
+				if (g_localStorage.colorType === g_keycons.colorSelf) {
+					g_colorType = `Default`;
+				}
+				g_keycons.colorTypes = g_keycons.colorTypes.filter(val => val !== g_keycons.colorSelf);
+			}
+
+			const keyCtrlPtn = `${g_keyObj.currentKey}_${g_keyObj.currentPtn}`;
+
+			// カラーグループ、シャッフルグループの設定
+			g_keycons.groups.forEach(type => {
+				resetGroupList(type, keyCtrlPtn);
+				if (g_keyObj.currentPtn === -1) {
+					const storageKeyName = storageObj[`${type}${addKey}`] || storageObj[`${type}${g_keyObj.currentKey}_-1_-1`];
+					if (storageKeyName !== undefined) {
+						g_keyObj[`${type}${g_keyObj.currentKey}_-1`] = structuredClone(storageKeyName);
+					}
+					g_keyObj[`${type}${g_keyObj.currentKey}_-1_-1`] = structuredClone(g_keyObj[`${type}${g_keyObj.currentKey}_-1`]);
+				} else {
+					g_keyObj[`${type}${keyCtrlPtn}`] = structuredClone(g_keyObj[`${type}${keyCtrlPtn}_0`]);
+				}
+			});
+
+		}
+
+		const keyCtrlPtn = `${g_keyObj.currentKey}_${g_keyObj.currentPtn}`;
+		if (g_headerObj.keyRetryDef === C_KEY_RETRY) {
+			g_headerObj.keyRetry = setIntVal(getKeyCtrlVal(g_keyObj[`keyRetry${keyCtrlPtn}`]), g_headerObj.keyRetryDef);
+		}
+		if (g_headerObj.keyTitleBackDef === C_KEY_TITLEBACK) {
+			g_headerObj.keyTitleBack = setIntVal(getKeyCtrlVal(g_keyObj[`keyTitleBack${keyCtrlPtn}`]), g_headerObj.keyTitleBackDef);
+		}
+	}
+
+	// スクロール設定用の配列を入れ替え
+	g_settings.scrolls = structuredClone(
+		typeof g_keyObj[`scrollDir${g_keyObj.currentKey}_${g_keyObj.currentPtn}`] === C_TYP_OBJECT ?
+			Object.keys(g_keyObj[`scrollDir${g_keyObj.currentKey}_${g_keyObj.currentPtn}`]) : g_keyObj.scrollName_def
+	);
+
+	// アシスト設定の配列を入れ替え
+	g_settings.autoPlays = (typeof g_keyObj[`assistPos${g_keyObj.currentKey}_${g_keyObj.currentPtn}`] === C_TYP_OBJECT ?
+		g_autoPlaysBase.concat(Object.keys(g_keyObj[`assistPos${g_keyObj.currentKey}_${g_keyObj.currentPtn}`])) :
+		g_autoPlaysBase.concat());
+
+	// ゲージ設定及びカーソル位置調整
+	setGauge(0, true);
+
+	// 速度、スクロール、アシスト設定のカーソル位置調整
+	if (_initFlg) {
+		g_stateObj.speed = g_headerObj.initSpeeds[g_stateObj.scoreId];
+		g_settings.speedNum = getCurrentNo(g_settings.speeds, g_stateObj.speed);
+	}
+	g_settings.scrollNum = getCurrentNo(g_settings.scrolls, g_stateObj.scroll);
+	g_settings.autoPlayNum = getCurrentNo(g_settings.autoPlays, g_stateObj.autoPlay);
+
+	// ---------------------------------------------------
+	// 3. 名称の設定
+
+	// 譜面名設定 (Difficulty)
+	const difWidth = parseFloat(lnkDifficulty.style.width);
+	const difNames = [`${getKeyName(g_keyObj.currentKey)} ${getStgDetailName('key')} / ${g_headerObj.difLabels[g_stateObj.scoreId]}`];
+	lnkDifficulty.style.fontSize = `${getFontSize(difNames[0], difWidth, getBasicFont(), g_limitObj.setLblSiz)}px`;
+
+	if (g_headerObj.makerView) {
+		difNames.push(`(${g_headerObj.creatorNames[g_stateObj.scoreId]})`);
+		difNames.forEach((difName, j) => {
+			const tmpSize = getFontSize(difName, difWidth, getBasicFont(), 14);
+			difNames[j] = `<span style="font-size:${tmpSize}px">${difName}</span>`;
+		});
+	}
+	lnkDifficulty.innerHTML = difNames.join(``);
+
+	// 速度設定 (Speed)
+	setSetting(0, `speed`, ` ${g_lblNameObj.multi}`);
+	if (g_settings.scoreDetails.length > 0) {
+		drawSpeedGraph(g_stateObj.scoreId);
+		drawDensityGraph(g_stateObj.scoreId);
+		makeDifInfo(g_stateObj.scoreId);
+	}
+
+	// リバース設定 (Reverse, Scroll)
+	if (g_headerObj.scrollUse) {
+		g_stateObj.scroll = g_settings.scrolls[g_settings.scrollNum];
+		const [visibleScr, hiddenScr] = (g_settings.scrolls.length > 1 ? [`scroll`, `reverse`] : [`reverse`, `scroll`]);
+		document.getElementById(`${visibleScr}Sprite`).style.display = C_DIS_INHERIT;
+		document.getElementById(`${hiddenScr}Sprite`).style.display = C_DIS_NONE;
+		setSetting(0, visibleScr);
+
+		g_shortcutObj.option.KeyR.id = g_settings.scrolls.includes(`Reverse`) ?
+			g_shortcutObj.option.KeyR.exId : g_shortcutObj.option.KeyR.dfId;
+
+		if (g_settings.scrolls.length > 1) {
+			setReverseView(document.querySelector(`#btnReverse`));
+		}
+	} else {
+		g_settings.scrolls = structuredClone(g_keyObj.scrollName_def);
+		setSetting(0, `reverse`);
+	}
+
+	// オート・アシスト設定 (AutoPlay)
+	g_stateObj.autoPlay = g_settings.autoPlays[g_settings.autoPlayNum];
+	lnkAutoPlay.textContent = getStgDetailName(g_stateObj.autoPlay);
+
+	// ユーザカスタムイベント(初期)
+	g_customJsObj.difficulty.forEach(func => func(_initFlg, g_canLoadDifInfoFlg));
+
+	// ---------------------------------------------------
+	// 4. 譜面初期情報ロード許可フラグの設定
+	g_canLoadDifInfoFlg = true;
 };
 
 /**
@@ -4124,161 +5078,16 @@ const createOptionWindow = _sprite => {
 	// 各ボタン用のスプライトを作成
 	const optionsprite = createOptionSprite(_sprite);
 
-	// 設定名、縦位置、縦位置差分、幅差分、高さ差分
-	const settingList = [
-		[`difficulty`, 0, -5, 0, 10],
-		[`speed`, 2, 0, 0, 0],
-		[`motion`, 3, 0, 0, 0],
-		[`reverse`, 4, 0, 0, 0],
-		[`scroll`, 4, 0, 0, 0],
-		[`shuffle`, 5.5, 0, 0, 0],
-		[`autoPlay`, 6.5, 0, 0, 0],
-		[`gauge`, 7.5, 0, 0, 0],
-		[`adjustment`, 10, 0, 0, 0],
-		[`fadein`, 11, 0, 0, 0],
-		[`volume`, 12, 0, 0, 0],
-	];
-
 	// 設定毎に個別のスプライトを作成し、その中にラベル・ボタン類を配置
-	const spriteList = setSpriteList(settingList);
+	const spriteList = setSpriteList(g_settingPos.option);
 
 	// ---------------------------------------------------
 	// 難易度 (Difficulty)
 	// 縦位置: 0 
 	spriteList.difficulty.appendChild(createLblSetting(`Difficulty`, -5));
 
-	/**
-	 * 譜面変更セレクターの削除
-	 */
-	const resetDifWindow = _ => {
-		if (document.querySelector(`#difList`) !== null) {
-			deleteChildspriteAll(`difList`);
-			[`difList`, `difCover`, `btnDifU`, `btnDifD`].forEach(obj => optionsprite.removeChild(document.getElementById(obj)));
-			g_currentPage = `option`;
-			setShortcutEvent(g_currentPage, _ => true, { displayFlg: false, dfEvtFlg: true });
-		}
-	};
-
-	/**
-	 * 譜面選択処理
-	 * @param {number} _scrollNum 
-	 */
-	const nextDifficulty = (_scrollNum = 1) => {
-		g_keyObj.prevKey = g_headerObj.keyLabels[g_stateObj.scoreId];
-		g_stateObj.scoreId = nextPos(g_stateObj.scoreId, _scrollNum, g_headerObj.keyLabels.length);
-		setDifficulty(true);
-		resetDifWindow();
-	};
-
-	/**
-	 * 譜面リストの作成
-	 * @param {object} _difList 
-	 * @param {string} _targetKey 
-	 */
-	const makeDifList = (_difList, _targetKey = ``) => {
-		let k = 0;
-		let pos = 0;
-		g_headerObj.keyLabels.forEach((keyLabel, j) => {
-			if (_targetKey === `` || keyLabel === _targetKey) {
-				let text = `${getKeyName(keyLabel)} / ${g_headerObj.difLabels[j]}`;
-				if (g_headerObj.makerView) {
-					text += ` (${g_headerObj.creatorNames[j]})`;
-				}
-				_difList.appendChild(makeDifLblCssButton(`dif${k}`, text, k, _ => {
-					nextDifficulty(j - g_stateObj.scoreId);
-				}, { btnStyle: (j === g_stateObj.scoreId ? `Setting` : `Default`) }));
-				if (j === g_stateObj.scoreId) {
-					pos = k + 6;
-				}
-				k++;
-			}
-		});
-		const overlength = pos * C_LEN_SETLBL_HEIGHT - parseInt(difList.style.height);
-		difList.scrollTop = (overlength > 0 ? overlength : 0);
-	};
-
-	/**
-	 * 譜面セレクター位置の変更ボタン
-	 * @param {number} _scrollNum 
-	 * @returns 
-	 */
-	const makeDifBtn = (_scrollNum = 1) => {
-		const dir = _scrollNum === 1 ? `D` : `U`;
-		return createCss2Button(`btnDif${dir}`, g_settingBtnObj.chara[dir], _ => {
-			do {
-				g_stateObj.scoreId = nextPos(g_stateObj.scoreId, _scrollNum, g_headerObj.keyLabels.length);
-			} while (g_stateObj.filterKeys !== `` && g_stateObj.filterKeys !== g_headerObj.keyLabels[g_stateObj.scoreId]);
-			setDifficulty(true);
-			deleteChildspriteAll(`difList`);
-			makeDifList(difList, g_stateObj.filterKeys);
-		}, {
-			x: 430 + _scrollNum * 10, y: 40, w: 20, h: 20, siz: C_SIZ_JDGCNTS,
-		}, g_cssObj.button_Mini);
-	};
-
-	/**
-	 * 譜面変更セレクターの作成・再作成
-	 * @param {string} _key
-	 */
-	const createDifWindow = (_key = ``) => {
-		g_currentPage = `difSelector`;
-		setShortcutEvent(g_currentPage);
-		const difList = createEmptySprite(optionsprite, `difList`, g_windowObj.difList, g_cssObj.settings_DifSelector);
-		const difCover = createEmptySprite(optionsprite, `difCover`, g_windowObj.difCover, g_cssObj.settings_DifSelector);
-
-		// リスト再作成
-		makeDifList(difList, _key);
-
-		// ランダム選択
-		difCover.appendChild(
-			makeDifLblCssButton(`difRandom`, `RANDOM`, 0, _ => {
-				nextDifficulty(Math.floor(Math.random() * g_headerObj.keyLabels.length));
-			}, { w: C_LEN_DIFCOVER_WIDTH })
-		);
-
-		// 全リスト
-		difCover.appendChild(
-			makeDifLblCssButton(`keyFilter`, `ALL`, 1.5, _ => {
-				resetDifWindow();
-				g_stateObj.filterKeys = ``;
-				createDifWindow();
-			}, { w: C_LEN_DIFCOVER_WIDTH, btnStyle: (g_stateObj.filterKeys === `` ? `Setting` : `Default`) })
-		);
-
-		// キー別フィルタボタン作成
-		let pos = 0;
-		g_headerObj.keyLists.forEach((targetKey, m) => {
-			difCover.appendChild(
-				makeDifLblCssButton(`keyFilter${m}`, `${getKeyName(targetKey)} key`, m + 2.5, _ => {
-					resetDifWindow();
-					g_stateObj.filterKeys = targetKey;
-					createDifWindow(targetKey);
-				}, { w: C_LEN_DIFCOVER_WIDTH, btnStyle: (g_stateObj.filterKeys === targetKey ? `Setting` : `Default`) })
-			);
-			if (g_stateObj.filterKeys === targetKey) {
-				pos = m + 9;
-			}
-		});
-		const overlength = pos * C_LEN_SETLBL_HEIGHT - parseInt(difCover.style.height);
-		difCover.scrollTop = (overlength > 0 ? overlength : 0);
-
-		multiAppend(optionsprite, makeDifBtn(-1), makeDifBtn());
-	};
-
-	const changeDifficulty = (_num = 1) => {
-		if (g_headerObj.difSelectorUse) {
-			g_stateObj.filterKeys = ``;
-			if (document.querySelector(`#difList`) === null) {
-				createDifWindow();
-			} else {
-				resetDifWindow();
-			}
-		} else {
-			nextDifficulty(_num);
-		}
-	};
 	const lnkDifficulty = makeSettingLblCssButton(`lnkDifficulty`, ``, 0, _ => changeDifficulty(), {
-		y: -10, h: C_LEN_SETLBL_HEIGHT + 10, cxtFunc: _ => changeDifficulty(-1),
+		y: -10, h: g_limitObj.setLblHeight + 10, cxtFunc: _ => changeDifficulty(-1),
 	});
 
 	// 譜面選択ボタン（メイン、右回し、左回し）
@@ -4318,8 +5127,8 @@ const createOptionWindow = _sprite => {
 			const bkColor = window.getComputedStyle(textBaseObj, ``).backgroundColor;
 
 			graphObj.id = `graph${_name}`;
-			graphObj.width = C_LEN_GRAPH_WIDTH;
-			graphObj.height = C_LEN_GRAPH_HEIGHT;
+			graphObj.width = g_limitObj.graphWidth;
+			graphObj.height = g_limitObj.graphHeight;
 			graphObj.style.left = `125px`;
 			graphObj.style.top = `0px`;
 			graphObj.style.position = `absolute`;
@@ -4332,10 +5141,13 @@ const createOptionWindow = _sprite => {
 		return detailObj;
 	};
 
-	if (g_headerObj.scoreDetailUse) {
-		spriteList.speed.appendChild(
+	if (g_settings.scoreDetails.length > 0) {
+		multiAppend(spriteList.speed,
+			createCss2Button(`btnGraphB`, ``, _ => true, {
+				x: -25, y: -60, w: 0, h: 0, opacity: 0, resetFunc: _ => setScoreDetail(true),
+			}, g_cssObj.button_Mini),
 			createCss2Button(`btnGraph`, `i`, _ => true, {
-				x: -25, y: -60, w: 30, h: 30, siz: C_SIZ_JDGCHARA, title: g_msgObj.graph,
+				x: -25, y: -60, w: 30, h: 30, siz: g_limitObj.jdgCharaSiz, title: g_msgObj.graph,
 				resetFunc: _ => setScoreDetail(), cxtFunc: _ => setScoreDetail(),
 			}, g_cssObj.button_Mini)
 		);
@@ -4373,7 +5185,7 @@ const createOptionWindow = _sprite => {
 		);
 		g_settings.scoreDetails.forEach((sd, j) => {
 			scoreDetail.appendChild(
-				makeDifLblCssButton(`lnk${sd}G`, getStgDetailName(sd), j, _ => changeScoreDetail(j), { w: C_LEN_DIFCOVER_WIDTH, btnStyle: (g_stateObj.scoreDetail === sd ? `Setting` : `Default`) })
+				makeDifLblCssButton(`lnk${sd}G`, getStgDetailName(sd), j, _ => changeScoreDetail(j), { w: g_limitObj.difCoverWidth, btnStyle: (g_stateObj.scoreDetail === sd ? `Setting` : `Default`) })
 			);
 			createScText(document.getElementById(`lnk${sd}G`), `${sd}G`, { targetLabel: `lnk${sd}G`, x: -10 });
 		});
@@ -4382,7 +5194,7 @@ const createOptionWindow = _sprite => {
 	/**
 	 * 譜面明細表示／非表示ボタンの処理
 	 */
-	const setScoreDetail = _ => {
+	const setScoreDetail = (_resetFlg = false) => {
 		if (g_currentPage === `difSelector`) {
 			resetDifWindow();
 			g_stateObj.scoreDetailViewFlg = false;
@@ -4397,277 +5209,9 @@ const createOptionWindow = _sprite => {
 		detailObj.style.visibility = visibles[Number(g_stateObj.scoreDetailViewFlg)];
 
 		// Qキーを押したときのカーソル位置を先頭に初期化
-		g_shortcutObj.option.KeyQ.id = g_settings.scoreDetailCursors[0];
-	};
-
-	/**
-	 * 譜面基礎データの取得
-	 * @param {number} _scoreId 
-	 */
-	const getScoreBaseData = _scoreId => {
-		const arrowCnts = sumData(g_detailObj.arrowCnt[_scoreId]);
-		const frzCnts = sumData(g_detailObj.frzCnt[_scoreId]);
-		return {
-			arrowCnts: arrowCnts,
-			frzCnts: frzCnts,
-			apm: Math.round((arrowCnts + frzCnts) / (g_detailObj.playingFrame[_scoreId] / g_fps / 60)),
-			playingTime: transFrameToTimer(g_detailObj.playingFrame[_scoreId]),
-		};
-	};
-
-	/**
-	 * 速度変化グラフの描画
-	 * @param {number} _scoreId
-	 */
-	const drawSpeedGraph = _scoreId => {
-		const startFrame = g_detailObj.startFrame[_scoreId];
-		const playingFrame = g_detailObj.playingFrameWithBlank[_scoreId];
-		const speedObj = {
-			speed: { frame: [0], speed: [1], cnt: 0, strokeColor: C_CLR_SPEEDGRAPH_SPEED },
-			boost: { frame: [0], speed: [1], cnt: 0, strokeColor: C_CLR_SPEEDGRAPH_BOOST }
-		};
-
-		Object.keys(speedObj).forEach(speedType => {
-			let frame = speedObj[speedType].frame;
-			let speed = speedObj[speedType].speed;
-			const speedData = g_detailObj[`${speedType}Data`][_scoreId];
-
-			if (speedData !== undefined) {
-				for (let i = 0; i < speedData.length; i += 2) {
-					if (speedData[i] >= startFrame) {
-						frame.push(speedData[i] - startFrame);
-						speed.push(speedData[i + 1]);
-					}
-					speedObj[speedType].cnt++;
-				}
-				frame.push(playingFrame);
-				speed.push(speed[speed.length - 1]);
-			}
-		});
-
-		const canvas = document.querySelector(`#graphSpeed`);
-		const context = canvas.getContext(`2d`);
-		drawBaseLine(context);
-
-		Object.keys(speedObj).forEach((speedType, j) => {
-			context.beginPath();
-			let preY;
-
-			for (let i = 0; i < speedObj[speedType].frame.length; i++) {
-				const x = speedObj[speedType].frame[i] * (C_LEN_GRAPH_WIDTH - 30) / playingFrame + 30;
-				const y = (speedObj[speedType].speed[i] - 1) * -90 + 105;
-
-				context.lineTo(x, preY);
-				context.lineTo(x, y);
-				preY = y;
-			}
-
-			context.lineWidth = 1;
-			context.strokeStyle = speedObj[speedType].strokeColor;
-			context.stroke();
-
-			const lineX = (speedType === `speed`) ? 125 : 210;
-			context.beginPath();
-			context.moveTo(lineX, 215);
-			context.lineTo(lineX + 30, 215);
-			context.stroke();
-			context.font = `${C_SIZ_DIFSELECTOR}px ${getBasicFont()}`;
-			context.fillText(speedType, lineX + 35, 218);
-
-			updateScoreDetailLabel(`Speed`, `${speedType}S`, speedObj[speedType].cnt, j, g_lblNameObj[`s_${speedType}`]);
-		});
-	};
-
-	/**
-	 * 譜面密度グラフの描画
-	 * @param {number} _scoreId 
-	 */
-	const drawDensityGraph = _scoreId => {
-
-		const canvas = document.querySelector(`#graphDensity`);
-		const context = canvas.getContext(`2d`);
-		drawBaseLine(context);
-		for (let j = 0; j < C_LEN_DENSITY_DIVISION; j++) {
-			context.beginPath();
-			[``, `2Push`, `3Push`].forEach(val => {
-				context.fillStyle = (j === g_detailObj.maxDensity[_scoreId] ? g_graphColorObj[`max${val}`] : g_graphColorObj[`default${val}`]);
-				context.fillRect(16 * j * 16 / C_LEN_DENSITY_DIVISION + 30, 195 - 9 * g_detailObj[`density${val}Data`][_scoreId][j] / 10,
-					15.5 * 16 / C_LEN_DENSITY_DIVISION, 9 * g_detailObj[`density${val}Diff`][_scoreId][j] / 10
-				);
-			});
-			context.stroke();
+		if (_resetFlg) {
+			g_shortcutObj.option.KeyQ.id = g_settings.scoreDetailCursors[0];
 		}
-
-		const lineNames = [`1Push`, `2Push`, `3Push+`];
-		Object.keys(g_graphColorObj).filter(val => val.indexOf(`max`) !== -1).forEach((val, j) => {
-			const lineX = 70 + j * 70;
-
-			context.beginPath();
-			context.lineWidth = 3;
-			context.fillStyle = g_rankObj.rankColorAllPerfect;
-			context.strokeStyle = g_graphColorObj[val];
-			context.moveTo(lineX, 215);
-			context.lineTo(lineX + 20, 215);
-			context.stroke();
-			context.font = `${C_SIZ_DIFSELECTOR}px ${getBasicFont()}`;
-			context.fillText(lineNames[j], lineX + 20, 218);
-		});
-
-		const obj = getScoreBaseData(_scoreId);
-		updateScoreDetailLabel(`Density`, `APM`, obj.apm, 0, g_lblNameObj.s_apm);
-		updateScoreDetailLabel(`Density`, `Time`, obj.playingTime, 1, g_lblNameObj.s_time);
-		updateScoreDetailLabel(`Density`, `Arrow`, obj.arrowCnts, 3, g_lblNameObj.s_arrow);
-		updateScoreDetailLabel(`Density`, `Frz`, obj.frzCnts, 4, g_lblNameObj.s_frz);
-	};
-
-	/**
-	 * 譜面明細内の補足情報の登録・更新
-	 * @param {string} _name 表示する譜面明細のラベル
-	 * @param {string} _label 
-	 * @param {string} _value 
-	 * @param {number} _pos 表示位置
-	 * @param {string} _labelname
-	 */
-	const updateScoreDetailLabel = (_name, _label, _value, _pos = 0, _labelname = _label) => {
-		const baseLabel = (_bLabel, _bLabelname, _bAlign) =>
-			document.querySelector(`#detail${_name}`).appendChild(
-				createDivCss2Label(`${_bLabel}`, `${_bLabelname}`, {
-					x: 10, y: 105 + _pos * 20, w: 100, h: 20, siz: C_SIZ_DIFSELECTOR, align: _bAlign,
-				})
-			);
-		if (document.querySelector(`#data${_label}`) === null) {
-			baseLabel(`lbl${_label}`, `${_labelname}`, C_ALIGN_LEFT);
-			baseLabel(`data${_label}`, `${_value}`, C_ALIGN_RIGHT);
-		} else {
-			document.querySelector(`#data${_label}`).textContent = `${_value}`;
-		}
-	};
-
-	/**
-	 * グラフの縦軸を描画
-	 * @param {object} _context 
-	 * @param {number} _resolution 
-	 */
-	const drawBaseLine = (_context, _resolution = 10) => {
-		_context.clearRect(0, 0, C_LEN_GRAPH_WIDTH, C_LEN_GRAPH_HEIGHT);
-
-		for (let j = 0; j <= 2 * _resolution; j += 5) {
-			drawLine(_context, j / _resolution, `main`, 2);
-			for (let k = 1; k < 5; k++) {
-				drawLine(_context, (j + k) / _resolution, `sub`, 2);
-			}
-		}
-	};
-
-	/**
-	 * グラフ上に目盛を表示
-	 * @param {object} _context 
-	 * @param {number} _y 
-	 * @param {string} _lineType 
-	 * @param {number} _fixed
-	 */
-	const drawLine = (_context, _y, _lineType, _fixed = 0) => {
-		const lineY = (_y - 1) * -90 + 105;
-		_context.beginPath();
-		_context.moveTo(30, lineY);
-		_context.lineTo(C_LEN_GRAPH_WIDTH, lineY);
-		_context.lineWidth = 1;
-
-		if (_lineType === `main`) {
-			const textBaseObj = document.querySelector(`#lnkDifficulty`);
-			const textColor = window.getComputedStyle(textBaseObj, ``).color;
-			_context.strokeStyle = textColor;
-			_context.font = `12px ${getBasicFont()}`;
-			_context.fillStyle = textColor;
-			_context.fillText(_y.toFixed(_fixed), 0, lineY + 4);
-		} else {
-			_context.strokeStyle = `#646464`;
-		}
-		_context.stroke();
-	};
-
-	/**
-	 * 譜面の難易度情報用ラベル作成
-	 * @param {number} _scoreId 
-	 */
-	const makeDifInfoLabels = _scoreId => {
-
-		// ツール難易度
-		const detailToolDif = document.querySelector(`#detailToolDif`);
-		/**
-		 * 譜面の難易度情報ラベルの作成
-		 * @param {string} _lbl 
-		 * @param {string} _data 
-		 * @param {object} _obj 
-		 */
-		const makeDifInfoLabel = (_lbl, _data, { x = 130, y = 25, w = 125, h = 35, siz = C_SIZ_DIFSELECTOR, ...rest } = {}) =>
-			createDivCss2Label(_lbl, _data, { x, y, w, h, siz, align: C_ALIGN_LEFT, ...rest });
-
-		let printData = ``;
-		for (let j = 0; j < g_detailObj.arrowCnt.length; j++) {
-			const obj = getScoreBaseData(j);
-			printData +=
-				// 譜面番号
-				`[${j + 1}]\t` +
-				// ツール値
-				`${g_detailObj.toolDif[j].tool}\t` +
-				// 同時
-				`${g_detailObj.toolDif[j].douji}\t` +
-				// 縦連
-				`${g_detailObj.toolDif[j].tate}\t` +
-				// 総矢印数
-				`${(obj.arrowCnts + obj.frzCnts)}\t` +
-				// 矢印
-				`${obj.arrowCnts}\t` +
-				// フリーズアロー
-				`${obj.frzCnts}\t` +
-				// APM
-				`${obj.apm}\t` +
-				// 時間(分秒)
-				`${obj.playingTime}\r\n`;
-		}
-		multiAppend(detailToolDif,
-			makeDifInfoLabel(`lblTooldif`, g_lblNameObj.s_level, g_lblPosObj.lblTooldif),
-			makeDifInfoLabel(`dataTooldif`, ``, g_lblPosObj.dataTooldif),
-			makeDifInfoLabel(`lblDouji`, g_lblNameObj.s_douji, g_lblPosObj.lblDouji),
-			makeDifInfoLabel(`lblTate`, g_lblNameObj.s_tate, g_lblPosObj.lblTate),
-			makeDifInfoLabel(`dataDouji`, ``, g_lblPosObj.dataDouji),
-			makeDifInfoLabel(`dataTate`, ``, g_lblPosObj.dataTate),
-			makeDifInfoLabel(`lblArrowInfo`, g_lblNameObj.s_cnts, g_lblPosObj.lblArrowInfo),
-			makeDifInfoLabel(`dataArrowInfo`, ``, g_lblPosObj.dataArrowInfo),
-			makeDifInfoLabel(`lblArrowInfo2`, ``, g_lblPosObj.lblArrowInfo2),
-			makeDifInfoLabel(`dataArrowInfo2`, ``, g_lblPosObj.dataArrowInfo2),
-			makeDifLblCssButton(`lnkDifInfo`, g_lblNameObj.s_print, 8, _ => {
-				copyTextToClipboard(
-					`****** ${g_lblNameObj.s_printTitle} [${g_version}] ******\r\n\r\n`
-					+ `\t${g_lblNameObj.s_printHeader}\r\n\r\n${printData}`, g_msgInfoObj.I_0003
-				);
-			}, g_lblPosObj.lnkDifInfo),
-		);
-		createScText(lnkDifInfo, `DifInfo`, { targetLabel: `lnkDifInfo`, x: -10 });
-	};
-
-	/**
-	 * 譜面の難易度情報更新
-	 * @param {number} _scoreId 
-	 */
-	const makeDifInfo = _scoreId => {
-
-		const arrowCnts = sumData(g_detailObj.arrowCnt[_scoreId]);
-		const frzCnts = sumData(g_detailObj.frzCnt[_scoreId]);
-		const push3CntStr = (g_detailObj.toolDif[_scoreId].push3.length === 0 ? `None` : `(${g_detailObj.toolDif[_scoreId].push3})`);
-
-		if (document.querySelector(`#lblTooldif`) === null) {
-			makeDifInfoLabels(_scoreId);
-		}
-		dataTooldif.textContent = g_detailObj.toolDif[_scoreId].tool;
-		dataDouji.textContent = g_detailObj.toolDif[_scoreId].douji;
-		dataTate.textContent = g_detailObj.toolDif[_scoreId].tate;
-		lblArrowInfo2.innerHTML = g_lblNameObj.s_linecnts.split(`{0}`).join(g_detailObj.toolDif[_scoreId].push3cnt);
-		dataArrowInfo.innerHTML = `${arrowCnts + frzCnts} <span style="font-size:${C_SIZ_DIFSELECTOR}px;">(${arrowCnts} + ${frzCnts})</span>`;
-		dataArrowInfo2.innerHTML = `<br>(${g_detailObj.arrowCnt[_scoreId]})<br><br>
-			(${g_detailObj.frzCnt[_scoreId]})<br><br>
-			${push3CntStr}`.split(`,`).join(`/`);
 	};
 
 	// ---------------------------------------------------
@@ -4702,18 +5246,6 @@ const createOptionWindow = _sprite => {
 		spriteList.scroll.style.pointerEvents = C_DIS_NONE;
 	}
 
-	const setReverse = _btn => {
-		g_settings.reverseNum = (g_settings.reverseNum + 1) % 2;
-		g_stateObj.reverse = g_settings.reverses[g_settings.reverseNum];
-		setReverseView(_btn);
-	};
-
-	const setReverseView = _btn => {
-		_btn.classList.replace(g_cssObj[`button_Rev${g_settings.reverses[(g_settings.reverseNum + 1) % 2]}`],
-			g_cssObj[`button_Rev${g_settings.reverses[g_settings.reverseNum]}`]);
-		_btn.textContent = `${g_lblNameObj.Reverse}:${getStgDetailName(g_stateObj.reverse)}`;
-	};
-
 	// ---------------------------------------------------
 	// ミラー・ランダム (Shuffle)
 	// 縦位置: 5.5
@@ -4732,165 +5264,6 @@ const createOptionWindow = _sprite => {
 	// ゲージ設定詳細　縦位置: ゲージ設定+1
 	spriteList.gauge.appendChild(createDivCss2Label(`lblGauge2`, ``, g_lblPosObj.lblGauge2));
 
-	/**
-	 * ゲージ設定メイン
-	 * @param {number} _scrollNum 
-	 */
-	const setGauge = _scrollNum => {
-
-		// カーソルを動かさない場合は先にゲージ設定をリロード
-		if (_scrollNum === 0) {
-			gaugeChange(g_settings.gaugeNum);
-		}
-		setSetting(_scrollNum, `gauge`);
-
-		// カーソルを動かす場合は設定変更後にゲージ設定を再設定
-		if (_scrollNum !== 0) {
-			gaugeChange(g_settings.gaugeNum);
-		}
-		lblGauge2.innerHTML = gaugeFormat(g_stateObj.lifeMode,
-			g_stateObj.lifeBorder, g_stateObj.lifeRcv, g_stateObj.lifeDmg, g_stateObj.lifeInit, g_stateObj.lifeVariable);
-	};
-
-	/**
-	 * ゲージ設定の切替処理
-	 * @param {number} _gaugeNum 
-	 */
-	const gaugeChange = _gaugeNum => {
-		const tmpScoreId = g_stateObj.scoreId;
-
-		/**
-		 * ゲージ詳細変更
-		 * @param {object} _baseProperty 
-		 * @param {string} _setProperty 
-		 * @param {number} _magnification 
-		 */
-		const setLife = (_baseProperty, _setProperty, _magnification = 1) => {
-			if (setVal(_baseProperty[tmpScoreId], ``, C_TYP_FLOAT) !== ``) {
-				g_stateObj[_setProperty] = _baseProperty[tmpScoreId] * _magnification;
-			}
-		};
-
-		/**
-		 * ゲージ詳細一括変更
-		 * @param {object} _baseObj 
-		 * @param {object} _obj 
-		 */
-		const setLifeCategory = (_baseObj, { _magInit = 1, _magRcv = 1, _magDmg = 1 } = {}) => {
-			setLife(_baseObj.lifeInits, `lifeInit`, _magInit);
-			setLife(_baseObj.lifeRecoverys, `lifeRcv`, _magRcv);
-			setLife(_baseObj.lifeDamages, `lifeDmg`, _magDmg);
-		};
-
-		/**
-		 * ライフモード切替
-		 * @param {object} _baseObj 
-		 */
-		const changeLifeMode = (_baseObj) => {
-			if (_baseObj.lifeBorders[tmpScoreId] === `x`) {
-				g_stateObj.lifeBorder = 0;
-				g_stateObj.lifeMode = C_LFE_SURVIVAL;
-			} else {
-				g_stateObj.lifeBorder = _baseObj.lifeBorders[tmpScoreId];
-				g_stateObj.lifeMode = C_LFE_BORDER;
-			}
-		};
-
-		// ゲージ初期化
-		if (_gaugeNum === 0) {
-			if (hasVal(g_headerObj.lifeBorders[tmpScoreId])) {
-				changeLifeMode(g_headerObj);
-				g_gaugeType = (g_gaugeOptionObj.custom.length > 0 ? C_LFE_CUSTOM : g_stateObj.lifeMode);
-
-				g_stateObj.lifeVariable = g_gaugeOptionObj[`var${g_gaugeType}`][_gaugeNum];
-				g_settings.gauges = copyArray2d(g_gaugeOptionObj[g_gaugeType.toLowerCase()]);
-				g_stateObj.gauge = g_settings.gauges[g_settings.gaugeNum];
-			}
-			setLifeCategory(g_headerObj);
-
-		} else {
-			// 設定されたゲージ設定、カーソルに合わせて設定値を更新
-			g_stateObj.lifeVariable = g_gaugeOptionObj[`var${g_gaugeType}`][_gaugeNum];
-			if (g_gaugeOptionObj.custom.length === 0 ||
-				g_gaugeOptionObj.defaultList.includes(g_gaugeOptionObj[`defaultGauge${tmpScoreId}`])) {
-				const gType = (g_gaugeType === C_LFE_CUSTOM ?
-					toCapitalize(g_gaugeOptionObj[`defaultGauge${tmpScoreId}`]) : g_gaugeType);
-				g_stateObj.lifeMode = g_gaugeOptionObj[`type${gType}`][_gaugeNum];
-				g_stateObj.lifeBorder = g_gaugeOptionObj[`clear${gType}`][_gaugeNum];
-				g_stateObj.lifeInit = g_gaugeOptionObj[`init${gType}`][_gaugeNum];
-				g_stateObj.lifeRcv = g_gaugeOptionObj[`rcv${gType}`][_gaugeNum];
-				g_stateObj.lifeDmg = g_gaugeOptionObj[`dmg${gType}`][_gaugeNum];
-			}
-		}
-
-		// ゲージ設定(Light, Easy)の初期化
-		if (g_stateObj.gauge === `Light` || g_stateObj.gauge === `Easy`) {
-			setLifeCategory(g_headerObj, { _magRcv: 2 });
-		}
-
-		// ゲージ設定別に個別設定した場合はここで設定を上書き
-		// 譜面ヘッダー：gaugeXXX で設定した値がここで適用される
-		if (hasVal(g_gaugeOptionObj[`gauge${g_stateObj.gauge}s`])) {
-			const tmpGaugeObj = g_gaugeOptionObj[`gauge${g_stateObj.gauge}s`];
-			if (hasVal(tmpGaugeObj.lifeBorders[tmpScoreId])) {
-				changeLifeMode(tmpGaugeObj);
-			}
-			setLifeCategory(tmpGaugeObj);
-		}
-	};
-
-	/**
-	 * ゲージ設定の詳細表示を整形
-	 */
-	const gaugeFormat = (_mode, _border, _rcv, _dmg, _init, _lifeValFlg) => {
-		const initVal = g_headerObj.maxLifeVal * _init / 100;
-		const borderVal = (_mode === C_LFE_BORDER && _border !== 0 ?
-			Math.round(g_headerObj.maxLifeVal * _border / 100) : `-`);
-
-		let lifeValCss = ``;
-		if (_lifeValFlg === C_FLG_ON) {
-			lifeValCss = ` settings_lifeVal`;
-		}
-
-		// 整形用にライフ初期値を整数、回復・ダメージ量を小数第1位で丸める
-		const init = Math.round(initVal);
-		const border = (borderVal !== `-` ? borderVal : `-`);
-		const rcv = Math.round(_rcv * 100) / 100;
-		const dmg = Math.round(_dmg * 100) / 100;
-
-		return `<div id="gaugeDivCover" class="settings_gaugeDivCover">
-					<div id="lblGaugeDivTable" class="settings_gaugeDivTable">
-						<div id="lblGaugeStart" class="settings_gaugeDivTableCol settings_gaugeStart">
-							${g_lblNameObj.g_start}
-						</div>
-						<div id="lblGaugeBorder" class="settings_gaugeDivTableCol settings_gaugeEtc">
-							${g_lblNameObj.g_border}
-						</div>
-						<div id="lblGaugeRecovery" class="settings_gaugeDivTableCol settings_gaugeEtc">
-							${g_lblNameObj.g_recovery}
-						</div>
-						<div id="lblGaugeDamage" class="settings_gaugeDivTableCol settings_gaugeEtc">
-							${g_lblNameObj.g_damage}
-						</div>
-					</div>
-					<div id="dataGaugeDivTable" class="settings_gaugeDivTable">
-						<div id="dataGaugeStart" class="settings_gaugeDivTableCol settings_gaugeVal settings_gaugeStart">
-							${init}/${g_headerObj.maxLifeVal}
-						</div>
-						<div id="dataGaugeBorder" class="settings_gaugeDivTableCol settings_gaugeVal settings_gaugeEtc">
-							${border}
-						</div>
-						<div id="dataGaugeRecovery" class="settings_gaugeDivTableCol settings_gaugeVal settings_gaugeEtc${lifeValCss}">
-							${rcv}
-						</div>
-						<div id="dataGaugeDamage" class="settings_gaugeDivTableCol settings_gaugeVal settings_gaugeEtc${lifeValCss}">
-							${dmg}
-						</div>
-					</div>
-				</div>
-				`;
-	};
-
 	if (g_headerObj.gaugeUse) {
 		multiAppend(spriteList.gauge,
 			makeSettingLblCssButton(`lnkGauge`, ``, 0, _ => setGauge(1), { cxtFunc: _ => setGauge(-1) }),
@@ -4903,9 +5276,19 @@ const createOptionWindow = _sprite => {
 		spriteList.gauge.appendChild(makeDisabledLabel(`lnkGauge`, 0, getStgDetailName(g_stateObj.gauge)));
 	}
 
+	// 空押し判定設定 (Excessive)
+	if (g_headerObj.excessiveUse) {
+		spriteList.gauge.appendChild(
+			createCss2Button(`lnkExcessive`, g_lblNameObj.Excessive, evt => setExcessive(evt.target),
+				Object.assign(g_lblPosObj.btnExcessive, {
+					title: g_msgObj.excessive, cxtFunc: evt => setExcessive(evt.target),
+				}), g_cssObj.button_Default, g_cssObj[`button_Rev${g_stateObj.excessive}`])
+		);
+	}
+
 	// ---------------------------------------------------
 	// タイミング調整 (Adjustment)
-	// 縦位置: 10  短縮ショートカットあり
+	// 縦位置: 10.5  短縮ショートカットあり
 	createGeneralSetting(spriteList.adjustment, `adjustment`, {
 		skipTerms: g_settings.adjustmentTerms, hiddenBtn: true, scLabel: g_lblNameObj.sc_adjustment, roundNum: 5,
 		unitName: g_lblNameObj.frame,
@@ -4913,7 +5296,7 @@ const createOptionWindow = _sprite => {
 
 	// ---------------------------------------------------
 	// フェードイン (Fadein)
-	// 縦位置: 11 スライダーあり
+	// 縦位置: 11.5 スライダーあり
 	spriteList.fadein.appendChild(createLblSetting(`Fadein`));
 
 	const lnkFadein = createDivCss2Label(`lnkFadein`, `${g_stateObj.fadein}${g_lblNameObj.percent}`,
@@ -4944,193 +5327,14 @@ const createOptionWindow = _sprite => {
 
 	// ---------------------------------------------------
 	// ボリューム (Volume) 
-	// 縦位置: 12
+	// 縦位置: 12.5
 	createGeneralSetting(spriteList.volume, `volume`, { unitName: g_lblNameObj.percent });
 
-	/**
-	 * 譜面初期化処理
-	 * - 譜面の基本設定（キー数、初期速度、リバース、ゲージ設定）をここで行う
-	 * - g_canLoadDifInfoFlg は譜面初期化フラグで、初期化したくない場合は対象画面にて false にしておく
-	 *   (Display設定画面、キーコンフィグ画面では通常OFF)
-	 *   この関数を実行後、このフラグはONに戻るようになっている 
-	 * - [キーコン]->[初期化]->[名称設定]の順に配置する。
-	 *   初期化処理にてキー数関連の設定を行っているため、この順序で無いとデータが正しく格納されない
-	 */
-	const setDifficulty = (_initFlg) => {
-
-		const getCurrentNo = (_list, _target) => roundZero(_list.findIndex(item => item === _target));
-
-		// ---------------------------------------------------
-		// 1. キーコンフィグ設定 (KeyConfig)
-		g_keyObj.currentKey = g_headerObj.keyLabels[g_stateObj.scoreId];
-		const isNotSameKey = (g_keyObj.prevKey !== g_keyObj.currentKey);
-
-		if (g_headerObj.dummyScoreNos !== undefined) {
-			g_stateObj.dummyId = setIntVal(g_headerObj.dummyScoreNos[g_stateObj.scoreId], ``);
-		}
-		// 特殊キーフラグ
-		g_stateObj.extraKeyFlg = g_headerObj.keyExtraList.includes(g_keyObj.currentKey);
-
-		// ---------------------------------------------------
-		// 2. 初期化設定
-
-		// 保存した設定の再読込条件（設定画面切り替え時はスキップ）
-		// ローカルストレージで保存した設定を呼び出し
-		if ((g_canLoadDifInfoFlg && (isNotSameKey && g_stateObj.dataSaveFlg)) || _initFlg) {
-
-			if (isNotSameKey && g_keyObj.prevKey !== `Dummy`) {
-				// キーパターン初期化
-				g_keyObj.currentPtn = 0;
-			}
-			const hasKeyStorage = localStorage.getItem(`danonicw-${g_keyObj.currentKey}k`);
-			let storageObj, addKey = ``;
-
-			if (!g_stateObj.extraKeyFlg) {
-
-				// キー別のローカルストレージの初期設定　※特殊キーは除く
-				g_localKeyStorage = hasKeyStorage ? JSON.parse(hasKeyStorage) : {
-					reverse: C_FLG_OFF,
-					keyCtrl: [[]],
-					keyCtrlPtn: 0,
-					setColor: [],
-				};
-				storageObj = g_localKeyStorage;
-
-			} else {
-				storageObj = g_localStorage;
-				addKey = g_keyObj.currentKey;
-			}
-			if (isNotSameKey) {
-				getKeyReverse(storageObj, addKey);
-
-				// キーコンフィグ初期値設定
-				if (storageObj[`keyCtrlPtn${addKey}`] === undefined) {
-					storageObj[`keyCtrlPtn${addKey}`] = 0;
-				}
-				getKeyCtrl(storageObj, addKey);
-
-				// カラーセット初期値設定
-				if (storageObj[`setColor${addKey}`] === undefined) {
-					storageObj[`setColor${addKey}`] = [];
-				}
-				if (storageObj[`setColor${addKey}`].length > 0) {
-					g_keycons.colorTypes = addValtoArray(g_keycons.colorTypes, g_keycons.colorSelf);
-					resetColorType({ _fromObj: storageObj, _from: addKey, _to: g_keycons.colorSelf });
-					resetColorType({ _fromObj: storageObj, _from: addKey, _toObj: g_dfColorObj, _to: g_keycons.colorSelf });
-
-				} else {
-					if (g_localStorage.colorType === g_keycons.colorSelf) {
-						g_colorType = `Default`;
-					}
-					g_keycons.colorTypes = g_keycons.colorTypes.filter(val => val !== g_keycons.colorSelf);
-				}
-
-				const keyCtrlPtn = `${g_keyObj.currentKey}_${g_keyObj.currentPtn}`;
-
-				// カラーグループ、シャッフルグループの設定
-				g_keycons.groups.forEach(type => {
-					resetGroupList(type, keyCtrlPtn);
-					if (g_keyObj.currentPtn === -1) {
-						const storageKeyName = storageObj[`${type}${addKey}`] || storageObj[`${type}${g_keyObj.currentKey}_-1_-1`];
-						if (storageKeyName !== undefined) {
-							g_keyObj[`${type}${g_keyObj.currentKey}_-1`] = structuredClone(storageKeyName);
-						}
-						g_keyObj[`${type}${g_keyObj.currentKey}_-1_-1`] = structuredClone(g_keyObj[`${type}${g_keyObj.currentKey}_-1`]);
-					} else {
-						g_keyObj[`${type}${keyCtrlPtn}`] = structuredClone(g_keyObj[`${type}${keyCtrlPtn}_0`]);
-					}
-				});
-
-			}
-
-			const keyCtrlPtn = `${g_keyObj.currentKey}_${g_keyObj.currentPtn}`;
-			if (g_headerObj.keyRetryDef === C_KEY_RETRY) {
-				g_headerObj.keyRetry = setIntVal(g_keyObj[`keyRetry${keyCtrlPtn}`], g_headerObj.keyRetryDef);
-			}
-			if (g_headerObj.keyTitleBackDef === C_KEY_TITLEBACK) {
-				g_headerObj.keyTitleBack = setIntVal(g_keyObj[`keyTitleBack${keyCtrlPtn}`], g_headerObj.keyTitleBackDef);
-			}
-		}
-
-		// スクロール設定用の配列を入れ替え
-		g_settings.scrolls = copyArray2d(
-			typeof g_keyObj[`scrollDir${g_keyObj.currentKey}_${g_keyObj.currentPtn}`] === C_TYP_OBJECT ?
-				Object.keys(g_keyObj[`scrollDir${g_keyObj.currentKey}_${g_keyObj.currentPtn}`]) : g_keyObj.scrollName_def
-		);
-
-		// アシスト設定の配列を入れ替え
-		g_settings.autoPlays = (typeof g_keyObj[`assistPos${g_keyObj.currentKey}_${g_keyObj.currentPtn}`] === C_TYP_OBJECT ?
-			g_autoPlaysBase.concat(Object.keys(g_keyObj[`assistPos${g_keyObj.currentKey}_${g_keyObj.currentPtn}`])) :
-			g_autoPlaysBase.concat());
-
-		// 速度、ゲージ、スクロール、アシスト設定のカーソル位置調整
-		if (_initFlg) {
-			g_stateObj.speed = g_headerObj.initSpeeds[g_stateObj.scoreId];
-			g_settings.speedNum = getCurrentNo(g_settings.speeds, g_stateObj.speed);
-			g_settings.gaugeNum = 0;
-		}
-		g_settings.scrollNum = getCurrentNo(g_settings.scrolls, g_stateObj.scroll);
-		g_settings.autoPlayNum = getCurrentNo(g_settings.autoPlays, g_stateObj.autoPlay);
-
-		// ---------------------------------------------------
-		// 3. 名称の設定
-
-		// 譜面名設定 (Difficulty)
-		const difWidth = parseFloat(lnkDifficulty.style.width);
-		const difNames = [`${getKeyName(g_keyObj.currentKey)} ${getStgDetailName('key')} / ${g_headerObj.difLabels[g_stateObj.scoreId]}`];
-		lnkDifficulty.style.fontSize = `${getFontSize(difNames[0], difWidth, getBasicFont(), C_SIZ_SETLBL)}px`;
-
-		if (g_headerObj.makerView) {
-			difNames.push(`(${g_headerObj.creatorNames[g_stateObj.scoreId]})`);
-			difNames.forEach((difName, j) => {
-				const tmpSize = getFontSize(difName, difWidth, getBasicFont(), 14);
-				difNames[j] = `<span style="font-size:${tmpSize}px">${difName}</span>`;
-			});
-		}
-		lnkDifficulty.innerHTML = difNames.join(``);
-
-		// 速度設定 (Speed)
-		setSetting(0, `speed`, ` ${g_lblNameObj.multi}`);
-		if (g_headerObj.scoreDetailUse) {
-			drawSpeedGraph(g_stateObj.scoreId);
-			drawDensityGraph(g_stateObj.scoreId);
-			makeDifInfo(g_stateObj.scoreId);
-		}
-
-		// リバース設定 (Reverse, Scroll)
-		if (g_headerObj.scrollUse) {
-			g_stateObj.scroll = g_settings.scrolls[g_settings.scrollNum];
-			const [visibleScr, hiddenScr] = (g_settings.scrolls.length > 1 ? [`scroll`, `reverse`] : [`reverse`, `scroll`]);
-			spriteList[visibleScr].style.display = C_DIS_INHERIT;
-			spriteList[hiddenScr].style.display = C_DIS_NONE;
-			setSetting(0, visibleScr);
-			if (g_settings.scrolls.length > 1) {
-				setReverseView(document.querySelector(`#btnReverse`));
-			}
-		} else {
-			g_settings.scrolls = copyArray2d(g_keyObj.scrollName_def);
-			setSetting(0, `reverse`);
-		}
-
-		// オート・アシスト設定 (AutoPlay)
-		g_stateObj.autoPlay = g_settings.autoPlays[g_settings.autoPlayNum];
-		lnkAutoPlay.textContent = getStgDetailName(g_stateObj.autoPlay);
-
-		// ゲージ設定 (Gauge)
-		const defaultCustomGauge = g_gaugeOptionObj.custom0 || g_gaugeOptionObj.customDefault;
-		if (hasVal(defaultCustomGauge)) {
-			g_gaugeOptionObj.custom = (g_gaugeOptionObj[`custom${g_stateObj.scoreId}`] || defaultCustomGauge).concat();
-			g_gaugeOptionObj.varCustom = (g_gaugeOptionObj[`varCustom${g_stateObj.scoreId}`] || g_gaugeOptionObj.varCustom0 || g_gaugeOptionObj.varCustomDefault).concat();
-		}
-		setGauge(0);
-
-		// ユーザカスタムイベント(初期)
-		g_customJsObj.difficulty.forEach(func => func(_initFlg, g_canLoadDifInfoFlg));
-
-		// ---------------------------------------------------
-		// 4. 譜面初期情報ロード許可フラグの設定
-		g_canLoadDifInfoFlg = true;
-	};
+	// 譜面番号の再取得
+	g_stateObj.scoreId = getNextDifficulty(g_stateObj.scoreId, 0);
+	const keyLists = makeDedupliArray(g_headerObj.viewLists.map(j => g_headerObj.keyLabels[j]));
+	g_headerObj.viewKeyLists = keyLists.sort((a, b) => parseInt(a) - parseInt(b));
+	g_headerObj.difSelectorUse = getDifSelectorUse(g_rootObj.difSelectorUse);
 
 	// 設定画面の一通りのオブジェクトを作成後に譜面・速度・ゲージ設定をまとめて行う
 	setDifficulty(false);
@@ -5145,12 +5349,12 @@ const createOptionWindow = _sprite => {
  */
 const createGeneralSetting = (_obj, _settingName, { unitName = ``,
 	skipTerms = [...Array(3)].fill(1), hiddenBtn = false, addRFunc = _ => { }, addLFunc = _ => { },
-	settingLabel = _settingName, displayName = `option`, scLabel = ``, roundNum = 0 } = {}) => {
+	settingLabel = _settingName, displayName = g_currentPage, scLabel = ``, roundNum = 0, adjY = 0 } = {}) => {
 
 	const settingUpper = toCapitalize(_settingName);
 	const linkId = `lnk${settingUpper}`;
 	const initName = `${getStgDetailName(g_stateObj[_settingName])}${unitName}`;
-	_obj.appendChild(createLblSetting(settingUpper, 0, toCapitalize(settingLabel)));
+	_obj.appendChild(createLblSetting(settingUpper, adjY, toCapitalize(settingLabel)));
 
 	if (g_headerObj[`${_settingName}Use`] === undefined || g_headerObj[`${_settingName}Use`]) {
 
@@ -5188,8 +5392,8 @@ const createGeneralSetting = (_obj, _settingName, { unitName = ``,
 		// 右回し・左回しボタン（最内側）
 		if (skipTerms[2] > 1) {
 			multiAppend(_obj,
-				makeMiniCssButton(linkId, `RRR`, 0, _ => setSetting(skipTerms[2], _settingName, unitName, roundNum), { dw: -C_LEN_SETMINI_WIDTH / 2 }),
-				makeMiniCssButton(linkId, `LLL`, 0, _ => setSetting(skipTerms[2] * (-1), _settingName, unitName, roundNum), { dw: -C_LEN_SETMINI_WIDTH / 2 }),
+				makeMiniCssButton(linkId, `RRR`, 0, _ => setSetting(skipTerms[2], _settingName, unitName, roundNum), { dw: -g_limitObj.setMiniWidth / 2 }),
+				makeMiniCssButton(linkId, `LLL`, 0, _ => setSetting(skipTerms[2] * (-1), _settingName, unitName, roundNum), { dw: -g_limitObj.setMiniWidth / 2 }),
 			);
 		}
 
@@ -5253,11 +5457,9 @@ const setSetting = (_scrollNum, _settingName, _unitName = ``, _roundNum = 0) => 
 	}
 
 	if (_scrollNum > 0) {
-		settingNum = (settingNum === settingMax ?
-			0 : (settingNum + _scrollNum > settingMax ? settingMax : settingNum + _scrollNum));
+		settingNum = (settingNum === settingMax ? 0 : Math.min(settingNum + _scrollNum, settingMax));
 	} else if (_scrollNum < 0) {
-		settingNum = (settingNum === 0 ?
-			settingMax : (settingNum + _scrollNum <= 0 ? 0 : settingNum + _scrollNum));
+		settingNum = (settingNum === 0 ? settingMax : Math.max(settingNum + _scrollNum, 0));
 	}
 	g_stateObj[_settingName] = settingList[settingNum];
 	g_settings[`${_settingName}Num`] = settingNum;
@@ -5273,7 +5475,7 @@ const setSetting = (_scrollNum, _settingName, _unitName = ``, _roundNum = 0) => 
  */
 const makeDisabledLabel = (_id, _heightPos, _defaultStr) => {
 	return createDivCss2Label(_id, _defaultStr, {
-		x: C_LEN_SETLBL_LEFT, y: C_LEN_SETLBL_HEIGHT * _heightPos,
+		x: g_limitObj.setLblLeft, y: g_limitObj.setLblHeight * _heightPos,
 	}, g_cssObj.settings_Disabled);
 };
 
@@ -5287,9 +5489,239 @@ const getKeyReverse = (_localStorage, _extraKeyName = ``) => {
 		g_stateObj.reverse = _localStorage[`reverse${_extraKeyName}`] ?? C_FLG_OFF;
 		g_settings.reverseNum = roundZero(g_settings.reverses.findIndex(reverse => reverse === g_stateObj.reverse));
 	} else {
-		g_stateObj.reverse = C_FLG_OFF;
-		g_settings.reverseNum = 0;
+		setReverseDefault();
 	}
+};
+
+/**
+ * リバースのデフォルト化処理
+ */
+const setReverseDefault = _ => {
+	g_stateObj.reverse = C_FLG_OFF;
+	g_settings.reverseNum = 0;
+};
+
+const setReverse = _btn => {
+	if (!g_settings.scrolls.includes(`Reverse`)) {
+		g_settings.reverseNum = (g_settings.reverseNum + 1) % 2;
+		g_stateObj.reverse = g_settings.reverses[g_settings.reverseNum];
+		setReverseView(_btn);
+	}
+};
+
+const setReverseView = _btn => {
+	_btn.classList.replace(g_cssObj[`button_Rev${g_settings.reverses[(g_settings.reverseNum + 1) % 2]}`],
+		g_cssObj[`button_Rev${g_settings.reverses[g_settings.reverseNum]}`]);
+	if (!g_settings.scrolls.includes(`Reverse`)) {
+		_btn.textContent = `${g_lblNameObj.Reverse}:${getStgDetailName(g_stateObj.reverse)}`;
+	} else {
+		_btn.textContent = `X`;
+		setReverseDefault();
+	}
+};
+
+/**
+ * ゲージ設定メイン
+ * @param {number} _scrollNum 
+ */
+const setGauge = (_scrollNum, _gaugeInitFlg = false) => {
+
+	/**
+	 * ゲージ詳細一括変更
+	 * @param {object} _baseObj 
+	 * @param {object} _obj 
+	 */
+	const setLifeCategory = (_baseObj, { _magInit = 1, _magRcv = 1, _magDmg = 1 } = {}) => {
+		if (hasVal(_baseObj.lifeInits[g_stateObj.scoreId])) {
+			g_stateObj.lifeInit = _baseObj.lifeInits[g_stateObj.scoreId] * _magInit;
+		}
+		if (hasVal(_baseObj.lifeRecoverys[g_stateObj.scoreId])) {
+			g_stateObj.lifeRcv = _baseObj.lifeRecoverys[g_stateObj.scoreId] * _magRcv;
+		}
+		if (hasVal(_baseObj.lifeDamages[g_stateObj.scoreId])) {
+			g_stateObj.lifeDmg = _baseObj.lifeDamages[g_stateObj.scoreId] * _magDmg;
+		}
+	};
+
+	/**
+	 * ライフモード切替
+	 * @param {object} _baseObj 
+	 */
+	const changeLifeMode = (_baseObj) => {
+		if (_baseObj.lifeBorders[g_stateObj.scoreId] === `x`) {
+			g_stateObj.lifeBorder = 0;
+			g_stateObj.lifeMode = C_LFE_SURVIVAL;
+		} else {
+			g_stateObj.lifeBorder = _baseObj.lifeBorders[g_stateObj.scoreId];
+			g_stateObj.lifeMode = C_LFE_BORDER;
+		}
+	};
+
+	// ゲージ初期化
+	if (_gaugeInitFlg) {
+		// カスタムゲージの設定取得
+		const defaultCustomGauge = g_gaugeOptionObj.custom0 || g_gaugeOptionObj.customDefault;
+		if (hasVal(defaultCustomGauge)) {
+			g_gaugeOptionObj.custom = (g_gaugeOptionObj[`custom${g_stateObj.scoreId}`] || defaultCustomGauge).concat();
+			g_gaugeOptionObj.varCustom = (g_gaugeOptionObj[`varCustom${g_stateObj.scoreId}`] || g_gaugeOptionObj.varCustom0 || g_gaugeOptionObj.varCustomDefault).concat();
+		}
+
+		// ゲージタイプの設定
+		changeLifeMode(g_headerObj);
+		g_gaugeType = (g_gaugeOptionObj.custom.length > 0 ? C_LFE_CUSTOM : g_stateObj.lifeMode);
+
+		// ゲージ配列を入れ替え
+		g_settings.gauges = structuredClone(g_gaugeOptionObj[g_gaugeType.toLowerCase()]);
+		g_settings.gaugeNum = getCurrentNo(g_settings.gauges, g_stateObj.gauge);
+		g_stateObj.gauge = g_settings.gauges[g_settings.gaugeNum];
+	}
+	setSetting(_scrollNum, `gauge`);
+	g_stateObj.lifeVariable = g_gaugeOptionObj[`var${g_gaugeType}`][g_settings.gaugeNum];
+
+	// デフォルトゲージの設定を適用（g_gaugeOptionObjから取得）
+	if (g_gaugeOptionObj.custom.length === 0 ||
+		g_gaugeOptionObj.defaultList.includes(g_gaugeOptionObj[`defaultGauge${g_stateObj.scoreId}`])) {
+
+		const gType = (g_gaugeType === C_LFE_CUSTOM ?
+			toCapitalize(g_gaugeOptionObj[`defaultGauge${g_stateObj.scoreId}`]) : g_gaugeType);
+		const getGaugeVal = _type => g_gaugeOptionObj[`${_type}${gType}`][g_settings.gaugeNum];
+		g_stateObj.lifeMode = getGaugeVal(`type`);
+		g_stateObj.lifeBorder = getGaugeVal(`clear`);
+		g_stateObj.lifeInit = getGaugeVal(`init`);
+		g_stateObj.lifeRcv = getGaugeVal(`rcv`);
+		g_stateObj.lifeDmg = getGaugeVal(`dmg`);
+	}
+
+	// デフォルトゲージの初期設定（Light, Easyでは回復量を2倍にする）
+	if ([`Original`, `Light`, `Normal`, `Easy`].includes(g_stateObj.gauge)) {
+		setLifeCategory(g_headerObj, { _magRcv: [`Light`, `Easy`].includes(g_stateObj.gauge) ? 2 : 1 });
+	}
+
+	// ゲージ設定別に個別設定した場合はここで設定を上書き
+	// 譜面ヘッダー：gaugeXXX で設定した値がここで適用される
+	if (hasVal(g_gaugeOptionObj[`gauge${g_stateObj.gauge}s`])) {
+		const tmpGaugeObj = g_gaugeOptionObj[`gauge${g_stateObj.gauge}s`];
+		if (hasVal(tmpGaugeObj.lifeBorders[g_stateObj.scoreId])) {
+			changeLifeMode(tmpGaugeObj);
+		}
+		setLifeCategory(tmpGaugeObj);
+	}
+
+	// ゲージ詳細情報を表示
+	lblGauge2.innerHTML = gaugeFormat(g_stateObj.lifeMode,
+		g_stateObj.lifeBorder, g_stateObj.lifeRcv, g_stateObj.lifeDmg, g_stateObj.lifeInit, g_stateObj.lifeVariable);
+};
+
+/**
+ * ゲージ設定の詳細表示を整形
+ * @param {string} _mode 
+ * @param {number} _border 
+ * @param {number} _rcv 
+ * @param {number} _dmg 
+ * @param {number} _init 
+ * @param {string} _lifeValFlg 
+ */
+const gaugeFormat = (_mode, _border, _rcv, _dmg, _init, _lifeValFlg) => {
+	const initVal = g_headerObj.maxLifeVal * _init / 100;
+	const borderVal = g_headerObj.maxLifeVal * _border / 100;
+
+	// 整形用にライフ初期値を整数、回復・ダメージ量を小数第1位で丸める
+	const init = Math.round(initVal);
+	const borderText = (_mode === C_LFE_BORDER && _border !== 0 ? Math.round(borderVal) : `-`);
+	const toFixed2 = _val => Math.round(_val * 100) / 100;
+
+	let rcvText = toFixed2(_rcv), dmgText = toFixed2(_dmg);
+	let realRcv = _rcv, realDmg = _dmg;
+	const allCnt = sumData(g_detailObj.arrowCnt[g_stateObj.scoreId]) +
+		(g_headerObj.frzStartjdgUse ? 2 : 1) * sumData(g_detailObj.frzCnt[g_stateObj.scoreId]);
+
+	if (_lifeValFlg === C_FLG_ON) {
+		rcvText = ``, dmgText = ``;
+		if (allCnt > 0) {
+			realRcv = Math.min(calcLifeVal(_rcv, allCnt), g_headerObj.maxLifeVal);
+			realDmg = Math.min(calcLifeVal(_dmg, allCnt), g_headerObj.maxLifeVal);
+			rcvText = `${toFixed2(realRcv)}<br>`;
+			dmgText = `${toFixed2(realDmg)}<br>`;
+		}
+		rcvText += `<span class="settings_lifeVal">(${toFixed2(_rcv)})</span>`;
+		dmgText += `<span class="settings_lifeVal">(${toFixed2(_dmg)})</span>`;
+	}
+
+	// 達成率(Accuracy)・許容ミス数の計算
+	const [rateText, allowableCntsText] = getAccuracy(borderVal, realRcv, realDmg, initVal, allCnt);
+
+	return `<div id="gaugeDivCover" class="settings_gaugeDivCover">
+		<div id="lblGaugeDivTable" class="settings_gaugeDivTable">
+			<div id="lblGaugeStart" class="settings_gaugeDivTableCol settings_gaugeStart">
+				${g_lblNameObj.g_start}
+			</div>
+			<div id="lblGaugeBorder" class="settings_gaugeDivTableCol settings_gaugeEtc">
+				${g_lblNameObj.g_border}
+			</div>
+			<div id="lblGaugeRecovery" class="settings_gaugeDivTableCol settings_gaugeEtc">
+				${g_lblNameObj.g_recovery}
+			</div>
+			<div id="lblGaugeDamage" class="settings_gaugeDivTableCol settings_gaugeEtc">
+				${g_lblNameObj.g_damage}
+			</div>
+			<div id="lblGaugeRate" class="settings_gaugeDivTableCol settings_gaugeEtc">
+				${g_lblNameObj.g_rate}
+			</div>
+		</div>
+		<div id="dataGaugeDivTable" class="settings_gaugeDivTable">
+			<div id="dataGaugeStart" class="settings_gaugeDivTableCol settings_gaugeVal settings_gaugeStart">
+				${init}/${g_headerObj.maxLifeVal}
+			</div>
+			<div id="dataGaugeBorder" class="settings_gaugeDivTableCol settings_gaugeVal settings_gaugeEtc">
+				${borderText}
+			</div>
+			<div id="dataGaugeRecovery" class="settings_gaugeDivTableCol settings_gaugeVal settings_gaugeEtc">
+				${rcvText}
+			</div>
+			<div id="dataGaugeDamage" class="settings_gaugeDivTableCol settings_gaugeVal settings_gaugeEtc">
+				${dmgText}
+			</div>
+			<div id="dataGaugeRate" class="settings_gaugeDivTableCol settings_gaugeVal settings_gaugeEtc" title="${allowableCntsText}">
+				${rateText}
+			</div>
+		</div>
+	</div>
+	`;
+};
+
+/**
+ * 達成率、許容ミス数の取得
+ * @param {number} _border 
+ * @param {number} _rcv 
+ * @param {number} _dmg 
+ * @param {number} _init 
+ * @param {number} _allCnt 
+ */
+const getAccuracy = (_border, _rcv, _dmg, _init, _allCnt) => {
+	const justPoint = _rcv + _dmg > 0 ? Math.max(_border - _init + _dmg * _allCnt, 0) / (_rcv + _dmg) : 0;
+	const minRecovery = (_border === 0 ? Math.floor(justPoint + 1) : Math.ceil(justPoint));
+	const rate = Math.max(minRecovery / _allCnt * 100, 0);
+	let rateText = _allCnt > 0 ? (rate <= 100 ? `${rate.toFixed(2)}%` : `<span class="settings_lifeVal">${rate.toFixed(2)}%</span>`) : `----`;
+
+	// 許容ミス数の計算
+	const allowableCnts = Math.min(_allCnt - minRecovery, _allCnt);
+	let allowableCntsText = _allCnt > 0 ? (allowableCnts >= 0 ? `${allowableCnts}miss↓` : `Impossible (${allowableCnts}miss)`) : ``;
+
+	if ((_rcv === 0 && _dmg === 0) || _rcv < 0 || _dmg < 0) {
+		rateText = `----`;
+		allowableCntsText = ``;
+	}
+	return [rateText, allowableCntsText];
+};
+
+/**
+ * 空押し判定の設定
+ */
+const setExcessive = _btn => {
+	g_settings.excessiveNum = (g_settings.excessiveNum + 1) % 2;
+	g_stateObj.excessive = g_settings.excessives[g_settings.excessiveNum];
+	_btn.classList.replace(g_cssObj[`button_Rev${g_settings.excessives[(g_settings.excessiveNum + 1) % 2]}`],
+		g_cssObj[`button_Rev${g_settings.excessives[g_settings.excessiveNum]}`]);
 };
 
 /**
@@ -5300,7 +5732,7 @@ const getKeyReverse = (_localStorage, _extraKeyName = ``) => {
 const getKeyCtrl = (_localStorage, _extraKeyName = ``) => {
 	const baseKeyCtrlPtn = _localStorage[`keyCtrlPtn${_extraKeyName}`];
 	const basePtn = `${g_keyObj.currentKey}_${baseKeyCtrlPtn}`;
-	const baseKeyNum = g_keyObj[`chara${basePtn}`].length;
+	const baseKeyNum = g_keyObj[`${g_keyObj.defaultProp}${basePtn}`].length;
 
 	if (_localStorage[`keyCtrl${_extraKeyName}`] !== undefined && _localStorage[`keyCtrl${_extraKeyName}`][0].length > 0) {
 		const prevPtn = g_keyObj.currentPtn;
@@ -5318,12 +5750,10 @@ const getKeyCtrl = (_localStorage, _extraKeyName = ``) => {
 		const isUpdate = prevPtn !== -1 && g_keyObj.prevKey !== g_keyObj.currentKey;
 		g_keyCopyLists.multiple.forEach(header => {
 			if (g_keyObj[`${header}${basePtn}`] !== undefined && isUpdate) {
-				g_keyObj[`${header}${copyPtn}`] = copyArray2d(g_keyObj[`${header}${basePtn}`]);
+				g_keyObj[`${header}${copyPtn}`] = structuredClone(g_keyObj[`${header}${basePtn}`]);
 			}
 		});
-		g_keyCopyLists.simple.forEach(header => {
-			g_keyObj[`${header}${copyPtn}`] = g_keyObj[`${header}${basePtn}`];
-		});
+		g_keyCopyLists.simple.forEach(header => g_keyObj[`${header}${copyPtn}`] = g_keyObj[`${header}${basePtn}`]);
 
 		g_keycons.groups.forEach(type => {
 			let maxPtn = 0;
@@ -5331,7 +5761,7 @@ const getKeyCtrl = (_localStorage, _extraKeyName = ``) => {
 				maxPtn++;
 			}
 			for (let j = 0; j < maxPtn; j++) {
-				g_keyObj[`${type}${copyPtn}_${j}`] = copyArray2d(g_keyObj[`${type}${basePtn}_${j}`]);
+				g_keyObj[`${type}${copyPtn}_${j}`] = structuredClone(g_keyObj[`${type}${basePtn}_${j}`]);
 			}
 			g_keyObj[`${type}${copyPtn}_0d`] = structuredClone(g_keyObj[`${type}${copyPtn}_0`]);
 		});
@@ -5349,11 +5779,11 @@ const getKeyCtrl = (_localStorage, _extraKeyName = ``) => {
  */
 const makeSettingLblCssButton = (_id, _name, _heightPos, _func, { x, y, w, h, siz, cxtFunc = _ => true, ...rest } = {}, ..._classes) => {
 	const tmpObj = {
-		x: x !== undefined ? x : C_LEN_SETLBL_LEFT,
-		y: y !== undefined ? y : C_LEN_SETLBL_HEIGHT * _heightPos,
-		w: w !== undefined ? w : C_LEN_SETLBL_WIDTH,
-		h: h !== undefined ? h : C_LEN_SETLBL_HEIGHT,
-		siz: siz !== undefined ? siz : C_SIZ_SETLBL,
+		x: x !== undefined ? x : g_limitObj.setLblLeft,
+		y: y !== undefined ? y : g_limitObj.setLblHeight * _heightPos,
+		w: w !== undefined ? w : g_limitObj.setLblWidth,
+		h: h !== undefined ? h : g_limitObj.setLblHeight,
+		siz: siz !== undefined ? siz : g_limitObj.setLblSiz,
 		cxtFunc: cxtFunc !== undefined ? cxtFunc : _ => true,
 	};
 	return createCss2Button(_id, _name, _func, { ...tmpObj, ...rest }, g_cssObj.button_Default, ..._classes);
@@ -5366,11 +5796,11 @@ const makeSettingLblCssButton = (_id, _name, _heightPos, _func, { x, y, w, h, si
  * @param {number} _heightPos 上からの配置順
  * @param {function} _func
  */
-const makeDifLblCssButton = (_id, _name, _heightPos, _func, { x = 0, w = C_LEN_DIFSELECTOR_WIDTH, btnStyle = `Default` } = {}) => {
+const makeDifLblCssButton = (_id, _name, _heightPos, _func, { x = 0, w = g_limitObj.difSelectorWidth, btnStyle = `Default` } = {}) => {
 	return createCss2Button(_id, _name, _func, {
-		x: x, y: C_LEN_SETLBL_HEIGHT * _heightPos,
-		w: w, h: C_LEN_SETLBL_HEIGHT,
-		siz: C_SIZ_DIFSELECTOR,
+		x: x, y: g_limitObj.setLblHeight * _heightPos,
+		w: w, h: g_limitObj.setLblHeight,
+		siz: g_limitObj.difSelectorSiz,
 		borderStyle: `solid`,
 	}, g_cssObj[`button_${btnStyle}`], g_cssObj.button_ON);
 };
@@ -5385,8 +5815,8 @@ const makeDifLblCssButton = (_id, _name, _heightPos, _func, { x = 0, w = C_LEN_D
 const makeMiniCssButton = (_id, _directionFlg, _heightPos, _func, { dx = 0, dy = 0, dw = 0, dh = 0, dsiz = 0, visibility = `visible` } = {}) => {
 	return createCss2Button(`${_id}${_directionFlg}`, g_settingBtnObj.chara[_directionFlg], _func, {
 		x: g_settingBtnObj.pos[_directionFlg] + dx,
-		y: C_LEN_SETLBL_HEIGHT * _heightPos + dy,
-		w: C_LEN_SETMINI_WIDTH + dw, h: C_LEN_SETLBL_HEIGHT + dh, siz: C_SIZ_SETLBL + dsiz,
+		y: g_limitObj.setLblHeight * _heightPos + dy,
+		w: g_limitObj.setMiniWidth + dw, h: g_limitObj.setLblHeight + dh, siz: g_limitObj.setLblSiz + dsiz,
 		visibility: visibility
 	}, g_cssObj.button_Mini);
 };
@@ -5473,8 +5903,8 @@ const createSettingsDisplayWindow = _sprite => {
 		 */
 		const makeDisabledDisplayLabel = (_id, _heightPos, _widthPos, _defaultStr, _flg) => {
 			return createDivCss2Label(_id, _defaultStr, {
-				x: 30 + 180 * _widthPos, y: 3 + C_LEN_SETLBL_HEIGHT * _heightPos,
-				w: 170, siz: C_SIZ_DIFSELECTOR,
+				x: 30 + 180 * _widthPos, y: 3 + g_limitObj.setLblHeight * _heightPos,
+				w: 170, siz: g_limitObj.difSelectorSiz,
 			}, g_cssObj[`button_Disabled${flg}`]);
 		};
 
@@ -5506,17 +5936,9 @@ const createSettingsDisplayWindow = _sprite => {
 	// 各ボタン用のスプライトを作成
 	createOptionSprite(_sprite);
 
-	// 設定名、縦位置、縦位置差分、幅差分、高さ差分
-	const settingList = [
-		[`appearance`, 7.4, 10, 0, 0],
-		[`opacity`, 9, 10, 0, 0],
-		[`errorbar`, 10 + 0.4, 10, 0, 0],
-		[`ratioType`, 11 + 0.4, 10, 0, 0]
-	];
-
 	// 設定毎に個別のスプライトを作成し、その中にラベル・ボタン類を配置
 	const displaySprite = createEmptySprite(optionsprite, `displaySprite`, g_windowObj.displaySprite);
-	const spriteList = setSpriteList(settingList);
+	const spriteList = setSpriteList(g_settingPos.settingsDisplay);
 
 	_sprite.appendChild(createDivCss2Label(`sdDesc`, g_lblNameObj.sdDesc, g_lblPosObj.sdDesc));
 	g_displays.forEach((name, j) => makeDisplayButton(name, j % 7, Math.floor(j / 7)));
@@ -5525,7 +5947,6 @@ const createSettingsDisplayWindow = _sprite => {
 	// 矢印の見え方 (Appearance)
 	// 縦位置: 7.4
 	createGeneralSetting(spriteList.appearance, `appearance`, {
-		displayName: g_currentPage,
 		addRFunc: _ => dispAppearanceSlider(),
 		addLFunc: _ => dispAppearanceSlider(),
 	});
@@ -5554,12 +5975,10 @@ const createSettingsDisplayWindow = _sprite => {
 	appearanceSlider.addEventListener(`input`, _ =>
 		g_hidSudObj.filterPos = inputSlider(appearanceSlider, lblAppearancePos), false);
 
-	const dispAppearanceSlider = _ => {
+	const dispAppearanceSlider = _ =>
 		[`lblAppearancePos`, `lblAppearanceBar`, `lnkLockBtn`, `lnkfilterLine`].forEach(obj =>
-			document.getElementById(obj).style.visibility =
-			g_appearanceRanges.includes(g_stateObj.appearance) ? `Visible` : `Hidden`
+			$id(obj).visibility = g_appearanceRanges.includes(g_stateObj.appearance) ? `Visible` : `Hidden`
 		);
-	};
 	dispAppearanceSlider();
 
 	// ---------------------------------------------------
@@ -5570,18 +5989,27 @@ const createSettingsDisplayWindow = _sprite => {
 		opacityUse ||= g_headerObj[`${display}Use`] || g_headerObj[`${display}Set`] === C_FLG_ON);
 
 	if (opacityUse) {
-		createGeneralSetting(spriteList.opacity, `opacity`, { unitName: g_lblNameObj.percent, displayName: g_currentPage });
+		createGeneralSetting(spriteList.opacity, `opacity`, { unitName: g_lblNameObj.percent });
 	}
+
+	// ---------------------------------------------------
+	// タイミング調整 (HitPosition)
+	// 縦位置: 10
+	createGeneralSetting(spriteList.hitPosition, `hitPosition`, {
+		skipTerms: g_settings.hitPositionTerms, scLabel: g_lblNameObj.sc_hitPosition, roundNum: 5,
+		unitName: g_lblNameObj.pixel,
+	});
 	
 	// ---------------------------------------------------
 	// 誤差判定のタイプ (Errorbar)
-	// 縦位置: 10
+	// 縦位置: 11.6
 	createGeneralSetting(spriteList.errorbar, `errorbar`, { displayName: g_currentPage, });
 
 	// ---------------------------------------------------
 	// 精度のタイプ (RatioType)
-	// 縦位置: 11
+	// 縦位置: 12.6
 	createGeneralSetting(spriteList.ratioType, `ratioType`, { displayName: g_currentPage, });
+
 };
 
 /**
@@ -5670,6 +6098,9 @@ const keyConfigInit = (_kcType = g_kcType) => {
 	const maxLeftPos = Math.max(divideCnt, posMax - divideCnt - 2) / 2;
 	const maxLeftX = Math.min(0, (kWidth - C_ARW_WIDTH) / 2 - maxLeftPos * g_keyObj.blank);
 
+	g_keycons.cursorNumList = [...Array(keyNum).keys()].map(i => i);
+	const configKeyGroupList = g_headerObj.keyGroupOrder[g_stateObj.scoreId] ?? tkObj.keyGroupList;
+
 	/**
 	 * keyconSpriteのスクロール位置調整
 	 * @param {number} _targetX 
@@ -5710,7 +6141,6 @@ const keyConfigInit = (_kcType = g_kcType) => {
 	 * @param {number} _len 
 	 * @param {number} _j 
 	 * @param {number} _scrollNum 
-	 * @returns 
 	 */
 	const changeTmpData = (_type, _len, _j, _scrollNum) => {
 		const tmpNo = nextPos(g_keyObj[`${_type}${keyCtrlPtn}_${g_keycons[`${_type}GroupNum`]}`][_j], _scrollNum, _len);
@@ -5768,11 +6198,11 @@ const keyConfigInit = (_kcType = g_kcType) => {
 			// 矢印の塗り部分
 			createColorObject2(`arrowShadow${j}`, {
 				x: keyconX, y: keyconY, background: hasVal(g_headerObj[`setShadowColor${g_colorType}`][colorPos]) ? getShadowColor(colorPos, arrowColor) : ``,
-				rotate: g_keyObj[`stepRtn${keyCtrlPtn}`][j], styleName: `Shadow`, pointerEvents: `none`,
+				rotate: g_keyObj[`stepRtn${keyCtrlPtn}_${g_keycons.stepRtnGroupNum}`][j], styleName: `Shadow`, pointerEvents: `none`,
 			}),
 			// 矢印本体
 			createColorObject2(`arrow${j}`, {
-				x: keyconX, y: keyconY, background: arrowColor, rotate: g_keyObj[`stepRtn${keyCtrlPtn}`][j], pointerEvents: `none`,
+				x: keyconX, y: keyconY, background: arrowColor, rotate: g_keyObj[`stepRtn${keyCtrlPtn}_${g_keycons.stepRtnGroupNum}`][j], pointerEvents: `none`,
 			}),
 		);
 		if (g_headerObj.shuffleUse && g_keyObj[`shuffle${keyCtrlPtn}`] !== undefined) {
@@ -5794,10 +6224,12 @@ const keyConfigInit = (_kcType = g_kcType) => {
 				createCss2Button(`keycon${j}_${k}`, g_kCd[g_keyObj[`keyCtrl${keyCtrlPtn}`][j][k]], _ => {
 					g_currentj = j;
 					g_currentk = k;
+					g_prevKey = -1;
+					g_keycons.cursorNum = g_keycons.cursorNumList.findIndex(val => val === g_currentj);
 					setKeyConfigCursor();
 				}, {
 					x: keyconX, y: 50 + C_KYC_REPHEIGHT * k + keyconY,
-					w: C_ARW_WIDTH, h: C_KYC_REPHEIGHT, siz: C_SIZ_JDGCNTS,
+					w: C_ARW_WIDTH, h: C_KYC_REPHEIGHT, siz: g_limitObj.keySetSiz,
 				}, g_cssObj.button_Default_NoColor, g_cssObj.title_base)
 			);
 
@@ -5836,6 +6268,7 @@ const keyConfigInit = (_kcType = g_kcType) => {
 				}
 			}
 		},
+		stepRtn: (_type = ``) => { },
 	};
 
 	/**
@@ -5860,6 +6293,9 @@ const keyConfigInit = (_kcType = g_kcType) => {
 		g_keycons[`${_type}GroupNum`] = g_keycons[`${_type}Groups`][getNextNum(_scrollNum, `${_type}Groups`, g_keycons[`${_type}GroupNum`])];
 		g_keyObj[`${_type}${keyCtrlPtn}`] = structuredClone(g_keyObj[`${_type}${keyCtrlPtn}_${g_keycons[`${_type}GroupNum`]}`]);
 		viewGroup(_type);
+		if (_type === `stepRtn`) {
+			keyConfigInit(g_kcType);
+		}
 	};
 
 	/**
@@ -5887,7 +6323,7 @@ const keyConfigInit = (_kcType = g_kcType) => {
 	 * @returns ボタン
 	 */
 	const makeKCButton = (_id, _text, _func, { x = g_sWidth * 5 / 6 - 20, y = 15, w = g_sWidth / 6, h = 18,
-		siz = C_SIZ_JDGCNTS, borderStyle = `solid`, cxtFunc, ...rest } = {}, _mainClass = g_cssObj.button_RevOFF, ..._classes) => {
+		siz = g_limitObj.jdgCntsSiz, borderStyle = `solid`, cxtFunc, ...rest } = {}, _mainClass = g_cssObj.button_RevOFF, ..._classes) => {
 		return makeSettingLblCssButton(_id, getStgDetailName(_text), 0, _func, { x, y, w, h, siz, cxtFunc, borderStyle, ...rest }, _mainClass, ..._classes);
 	};
 
@@ -5897,9 +6333,8 @@ const keyConfigInit = (_kcType = g_kcType) => {
 	 * @param {string} _directionFlg 
 	 * @param {function} _func 
 	 * @param {*} object (x, y, w, h, siz) 
-	 * @returns 
 	 */
-	const makeMiniKCButton = (_id, _directionFlg, _func, { x = g_sWidth * 5 / 6 - 30, y = 15, w = 15, h = 20, siz = C_SIZ_MAIN } = {}) => {
+	const makeMiniKCButton = (_id, _directionFlg, _func, { x = g_sWidth * 5 / 6 - 30, y = 15, w = 15, h = 20, siz = g_limitObj.mainSiz } = {}) => {
 		return createCss2Button(`${_id}${_directionFlg}`, g_settingBtnObj.chara[_directionFlg], _func,
 			{ x, y, w, h, siz }, g_cssObj.button_Mini);
 	};
@@ -5909,16 +6344,16 @@ const keyConfigInit = (_kcType = g_kcType) => {
 	 * @param {string} _type 
 	 * @param {object} obj (baseX) 
 	 */
-	const makeGroupButton = (_type, { baseX = g_sWidth * 5 / 6 - 20, cssName } = {}) => {
+	const makeGroupButton = (_type, { baseX = g_sWidth * 5 / 6 - 20, baseY = 0, cssName } = {}) => {
 		if (g_headerObj[`${_type}Use`] && g_keycons[`${_type}Groups`].length > 1) {
 			const typeName = toCapitalize(_type);
 			multiAppend(divRoot,
-				makeKCButtonHeader(`lbl${_type}Group`, `${typeName}Group`, { x: baseX - 10, y: 37 }, cssName),
+				makeKCButtonHeader(`lbl${_type}Group`, `${typeName}Group`, { x: baseX - 10, y: baseY }, cssName),
 				makeKCButton(`lnk${typeName}Group`, ``, _ => setGroup(_type), {
-					x: baseX, y: 50, w: g_sWidth / 18, title: g_msgObj[`${_type}Group`], cxtFunc: _ => setGroup(_type, -1),
+					x: baseX, y: baseY + 13, w: g_sWidth / 18, title: g_msgObj[`${_type}Group`], cxtFunc: _ => setGroup(_type, -1),
 				}),
-				makeMiniKCButton(`lnk${typeName}Group`, `L`, _ => setGroup(_type, -1), { x: baseX - 10, y: 50 }),
-				makeMiniKCButton(`lnk${typeName}Group`, `R`, _ => setGroup(_type), { x: baseX + g_sWidth / 18, y: 50 }),
+				makeMiniKCButton(`lnk${typeName}Group`, `L`, _ => setGroup(_type, -1), { x: baseX - 10, y: baseY + 13 }),
+				makeMiniKCButton(`lnk${typeName}Group`, `R`, _ => setGroup(_type), { x: baseX + g_sWidth / 18, y: baseY + 13 }),
 			);
 		} else {
 			g_keycons[`${_type}GroupNum`] = 0;
@@ -5939,19 +6374,13 @@ const keyConfigInit = (_kcType = g_kcType) => {
 			g_lblPosObj.kcMsg, g_cssObj.keyconfig_warning
 		),
 
-		// キーコンフィグタイプ切替ボタン
-		makeKCButtonHeader(`lblKcType`, `ConfigType`, { x: 10 }, g_cssObj.keyconfig_ConfigType),
-		makeKCButton(`lnkKcType`, g_kcType, _ => setConfigType(), {
-			x: 20, title: g_msgObj.configType, cxtFunc: _ => setConfigType(-1),
-		}),
-
 		// キーカラータイプ切替ボタン
-		makeKCButtonHeader(`lblcolorType`, `ColorType`, {}, g_cssObj.keyconfig_ColorType),
+		makeKCButtonHeader(`lblcolorType`, `ColorType`, { x: 10 }, g_cssObj.keyconfig_ColorType),
 		makeKCButton(`lnkColorType`, g_colorType, _ => setColorType(), {
-			title: g_msgObj.colorType, cxtFunc: _ => setColorType(-1),
+			x: 20, title: g_msgObj.colorType, cxtFunc: _ => setColorType(-1),
 		}),
-		makeMiniKCButton(`lnkColorType`, `L`, _ => setColorType(-1)),
-		makeMiniKCButton(`lnkColorType`, `R`, _ => setColorType(), { x: g_sWidth - 20 }),
+		makeMiniKCButton(`lnkColorType`, `L`, _ => setColorType(-1), { x: 10 }),
+		makeMiniKCButton(`lnkColorType`, `R`, _ => setColorType(), { x: 20 + g_sWidth / 6 }),
 	);
 
 	if (g_headerObj.imgType.length > 1) {
@@ -5970,21 +6399,7 @@ const keyConfigInit = (_kcType = g_kcType) => {
 	// カラー/シャッフルグループ切替ボタン（カラー/シャッフルパターンが複数ある場合のみ）
 	makeGroupButton(`color`, { cssName: g_cssObj.keyconfig_ColorType });
 	makeGroupButton(`shuffle`, { baseX: g_sWidth * 11 / 12 - 10, cssName: g_cssObj.settings_Shuffle });
-
-	/**
-	 * 次のカーソルへ移動
-	 * @param {number} _pos 
-	 */
-	const searchNextCursor = _pos => {
-		for (let j = g_currentj; j < keyNum + g_currentj; j++) {
-			if (g_keyObj[`keyCtrl${keyCtrlPtn}`][j % keyNum][_pos] !== undefined) {
-				g_currentj = j % keyNum;
-				g_currentk = _pos;
-				return true;
-			}
-		}
-		return false;
-	};
+	makeGroupButton(`stepRtn`, { baseY: 37, cssName: g_cssObj.settings_Adjustment });
 
 	/**
 	 * カーソル位置の設定
@@ -5997,35 +6412,40 @@ const keyConfigInit = (_kcType = g_kcType) => {
 		cursor.style.left = `${nextLeft}px`;
 		const baseY = C_KYC_HEIGHT * Number(posj > divideCnt) + 57;
 		cursor.style.top = `${baseY + C_KYC_REPHEIGHT * g_currentk}px`;
-		if (g_currentk === 0 && g_kcType === `Replaced`) {
-			g_kcType = C_FLG_ALL;
-			lnkKcType.textContent = getStgDetailName(g_kcType);
-		}
+		g_kcType = (g_currentk === 0 ? `Main` : `Replaced`);
 
 		// 次の位置が見えなくなったらkeyconSpriteの位置を調整する
 		adjustScrollPoint(nextLeft);
 	};
 
 	/**
-	 * キーコンフィグ用カーソルのリセット
-	 * @param {number} _resetPos
-	 * @param {boolean} _resetCursorFlg
+	 * カーソル位置の変更
+	 * @param {number} _nextj 
 	 */
-	const resetCursor = (_resetPos = 0, _resetCursorFlg = true) => {
-		g_prevKey = -1;
-		if (_resetCursorFlg) {
-			g_currentj = 0;
-			if (!searchNextCursor(_resetPos)) {
-				g_currentk = 0;
-			}
-		} else {
-			if (g_keyObj[`keyCtrl${keyCtrlPtn}`][g_currentj][_resetPos] === undefined) {
-				searchNextCursor(_resetPos);
-			} else {
-				g_currentk = _resetPos;
+	const changeConfigCursor = (_nextj = ++g_keycons.cursorNum % g_keycons.cursorNumList.length) => {
+		g_keycons.cursorNum = _nextj;
+
+		g_currentj = g_keycons.cursorNumList[_nextj];
+		g_currentk = 0;
+		if (g_kcType === `Replaced`) {
+			g_currentk = 1;
+
+			// 代替キー設定の場合は次の代替キーが見つかるまで移動
+			while (g_keyObj[`keyCtrl${keyCtrlPtn}`][g_currentj][1] === undefined) {
+				g_keycons.cursorNum = (g_keycons.cursorNum + 1) % g_keycons.cursorNumList.length;
+				g_currentj = g_keycons.cursorNumList[g_keycons.cursorNum];
+
+				// 一周して対象が無い場合は代替キーが無いため処理を抜ける（無限ループ対策）
+				if (g_keycons.cursorNum === _nextj) {
+					g_kcType = `Main`;
+					g_currentk = 0;
+					break;
+				}
 			}
 		}
+
 		setKeyConfigCursor();
+		keyconSprite.scrollLeft = - maxLeftX;
 	};
 
 	const getNextNum = (_scrollNum, _groupName, _target) => {
@@ -6039,8 +6459,48 @@ const keyConfigInit = (_kcType = g_kcType) => {
 	 */
 	const setConfigType = (_scrollNum = 1) => {
 		g_kcType = g_keycons.configTypes[getNextNum(_scrollNum, `configTypes`, g_kcType)];
-		resetCursor(Number(g_kcType === `Replaced`), _scrollNum === 0);
-		lnkKcType.textContent = getStgDetailName(g_kcType);
+		changeConfigCursor(g_keycons.cursorNum);
+	};
+
+	/**
+	 * 一部のキーコンフィグを表示する
+	 * （キーグループ毎にフィルターされたもののみを表示する）
+	 * @param {number} _num 
+	 */
+	const appearConfigSteps = _num => {
+
+		const appearConfigView = (_j, _display) => {
+			$id(`arrow${_j}`).display = _display;
+			$id(`arrowShadow${_j}`).display = _display;
+			$id(`color${_j}`).display = _display;
+			if (document.getElementById(`sArrow${_j}`) !== null) {
+				$id(`sArrow${_j}`).display = _display;
+			}
+			const ctrlPtn = g_keyObj[`keyCtrl${g_headerObj.keyLabels[g_stateObj.scoreId]}_${g_keyObj.currentPtn}`][_j];
+			for (let k = 0; k < ctrlPtn.length; k++) {
+				$id(`keycon${_j}_${k}`).display = _display;
+			}
+		};
+
+		g_keycons.keySwitchNum = _num;
+		g_keycons.cursorNumList = [];
+		for (let j = 0; j < keyNum; j++) {
+			appearConfigView(j, C_DIS_NONE);
+
+			if (tkObj.keyGroupMaps[j].includes(configKeyGroupList[_num])) {
+				g_keycons.cursorNumList.push(j);
+				appearConfigView(j, C_DIS_INHERIT);
+			}
+		}
+		changeConfigCursor(0);
+
+		// keySwitchボタンを一旦非選択にして、選択中のものを再度色付け
+		if (configKeyGroupList.length > 1) {
+			for (let j = 0; j < configKeyGroupList.length; j++) {
+				document.getElementById(`key${j}`).classList.replace(g_cssObj.button_Next, g_cssObj.button_Mini);
+			}
+			document.getElementById(`key${_num}`).classList.replace(g_cssObj.button_Mini, g_cssObj.button_Next);
+		}
 	};
 
 	/**
@@ -6052,9 +6512,9 @@ const keyConfigInit = (_kcType = g_kcType) => {
 	const changeColorPicker = (_j, _type, _color) => {
 		if (_color !== ``) {
 			document.getElementById(`pick${_type}${_j}`).value = _color.slice(0, 7);
-			document.getElementById(`pick${_type}${_j}`).style.display = C_DIS_INHERIT;
+			$id(`pick${_type}${_j}`).display = C_DIS_INHERIT;
 		} else {
-			document.getElementById(`pick${_type}${_j}`).style.display = C_DIS_NONE;
+			$id(`pick${_type}${_j}`).display = C_DIS_NONE;
 		}
 	};
 
@@ -6150,30 +6610,39 @@ const keyConfigInit = (_kcType = g_kcType) => {
 	 * @param {number} _tempPtn 
 	 * @param {number} _sign 
 	 * @param {boolean} _transKeyUse 
-	 * @returns 
 	 */
-	const searchPattern = (_tempPtn, _sign, _transKeyUse = false) => {
+	const searchPattern = (_tempPtn, _sign, _transKeyUse = false, _skipFlg = false) => {
 		let nextPtn = _tempPtn + _sign;
+		const initialPtn = hasVal(g_keyObj[`keyCtrl${g_keyObj.currentKey}_-1`]) ? -1 : 0;
 
 		const searchStart = _ => {
-			nextPtn = 0;
-			while (hasVal(g_keyObj[`keyCtrl${g_keyObj.currentKey}_${nextPtn}`])) {
-				nextPtn -= _sign;
+			if (!hasVal(g_keyObj[`keyCtrl${g_keyObj.currentKey}_${nextPtn}`])) {
+				nextPtn = 0;
+				while (hasVal(g_keyObj[`keyCtrl${g_keyObj.currentKey}_${nextPtn}`])) {
+					nextPtn -= _sign;
+				}
+				nextPtn += _sign;
 			}
-			nextPtn += _sign;
 		};
 
-		if (hasVal(g_keyObj[`keyCtrl${g_keyObj.currentKey}_${nextPtn}`])) {
-		} else {
+		const searchNextGroup = _ => {
+			while (nextPtn !== initialPtn &&
+				g_keyObj[`transKey${g_keyObj.currentKey}_${_tempPtn}`] === g_keyObj[`transKey${g_keyObj.currentKey}_${nextPtn}`] &&
+				hasVal(g_keyObj[`keyCtrl${g_keyObj.currentKey}_${nextPtn}`])) {
+				nextPtn += _sign;
+			}
+		};
+
+		searchStart();
+		if (_skipFlg) {
+			searchNextGroup();
 			searchStart();
 		}
 		if (!_transKeyUse) {
 			while (hasVal(g_keyObj[`transKey${g_keyObj.currentKey}_${nextPtn}`])) {
 				nextPtn += _sign;
 			}
-			if (!hasVal(g_keyObj[`keyCtrl${g_keyObj.currentKey}_${nextPtn}`])) {
-				searchStart();
-			}
+			searchStart();
 		}
 		return nextPtn;
 	};
@@ -6181,11 +6650,12 @@ const keyConfigInit = (_kcType = g_kcType) => {
 	/**
 	 * キーパターン変更時処理
 	 * @param {number} _sign 
+	 * @param {boolean} _skipFlg
 	 */
-	const changePattern = (_sign = 1) => {
+	const changePattern = (_sign = 1, _skipFlg = false) => {
 
 		// キーパターンの変更
-		g_keyObj.currentPtn = searchPattern(g_keyObj.currentPtn, _sign, g_headerObj.transKeyUse);
+		g_keyObj.currentPtn = searchPattern(g_keyObj.currentPtn, _sign, g_headerObj.transKeyUse, _skipFlg);
 
 		// カラーグループ、シャッフルグループの再設定
 		g_keycons.groups.forEach(type => resetGroupList(type, `${g_keyObj.currentKey}_${g_keyObj.currentPtn}`));
@@ -6203,6 +6673,22 @@ const keyConfigInit = (_kcType = g_kcType) => {
 	// ユーザカスタムイベント(初期)
 	g_customJsObj.keyconfig.forEach(func => func());
 
+	// 部分キー表示用ボタン描画
+	if (configKeyGroupList.length > 1) {
+		multiAppend(divRoot,
+			createDivCss2Label(`lblkey`, `KeySwitch`, { x: g_sWidth - 80, y: 90, w: 60, h: 20, siz: 14 }));
+		configKeyGroupList.forEach((val, j) => {
+			divRoot.appendChild(
+				createCss2Button(`key${j}`, `${j + 1}`, _ => {
+					appearConfigSteps(j);
+				}, { x: g_sWidth - 60, y: 110 + j * 20, w: 50, h: 20, siz: 14 }, g_cssObj.button_Mini),
+			);
+		});
+	}
+
+	// カーソル位置の初期化
+	appearConfigSteps(g_keycons.keySwitchNum);
+
 	// ラベル・ボタン描画
 	multiAppend(divRoot,
 
@@ -6219,26 +6705,39 @@ const keyConfigInit = (_kcType = g_kcType) => {
 			'Self' : g_keyObj.currentPtn + 1}${lblTransKey}`, g_lblPosObj.lblPattern),
 
 		// パターン変更ボタン描画(右回り)
-		createCss2Button(`btnPtnChangeR`, `>>`, _ => true, Object.assign(g_lblPosObj.btnPtnChangeR, {
+		createCss2Button(`btnPtnChangeR`, `>`, _ => true, Object.assign(g_lblPosObj.btnPtnChangeR, {
 			resetFunc: _ => changePattern(),
-		}), g_cssObj.button_Setting),
+		}), g_cssObj.button_Mini),
 
 		// パターン変更ボタン描画(左回り)
-		createCss2Button(`btnPtnChangeL`, `<<`, _ => true, Object.assign(g_lblPosObj.btnPtnChangeL, {
+		createCss2Button(`btnPtnChangeL`, `<`, _ => true, Object.assign(g_lblPosObj.btnPtnChangeL, {
 			resetFunc: _ => changePattern(-1),
+		}), g_cssObj.button_Mini),
+
+		// パターン変更ボタン描画(右回り/別キーモード間スキップ)
+		createCss2Button(`btnPtnChangeRR`, `|>`, _ => true, Object.assign(g_lblPosObj.btnPtnChangeRR, {
+			resetFunc: _ => changePattern(1, true),
+		}), g_cssObj.button_Setting),
+
+		// パターン変更ボタン描画(左回り/別キーモード間スキップ)
+		createCss2Button(`btnPtnChangeLL`, `<|`, _ => true, Object.assign(g_lblPosObj.btnPtnChangeLL, {
+			resetFunc: _ => changePattern(-1, true),
 		}), g_cssObj.button_Setting),
 
 		// キーコンフィグリセットボタン描画
 		createCss2Button(`btnReset`, g_lblNameObj.b_reset, _ => {
 			if (window.confirm(g_msgObj.keyResetConfirm)) {
-				for (let j = 0; j < keyNum; j++) {
+				const keyCtrlPtn = `${g_keyObj.currentKey}_${g_keyObj.currentPtn}`;
+
+				for (let m = 0; m < g_keycons.cursorNumList.length; m++) {
+					const j = g_keycons.cursorNumList[m];
 					for (let k = 0; k < g_keyObj[`keyCtrl${keyCtrlPtn}`][j].length; k++) {
 						g_keyObj[`keyCtrl${keyCtrlPtn}`][j][k] = setIntVal(g_keyObj[`keyCtrl${keyCtrlPtn}d`][j][k]);
 						document.querySelector(`#keycon${j}_${k}`).textContent = g_kCd[g_keyObj[`keyCtrl${keyCtrlPtn}`][j][k]];
 						changeKeyConfigColor(j, k, g_keyObj.currentPtn === -1 ? g_cssObj.keyconfig_Defaultkey : g_cssObj.title_base);
 					}
 				}
-				resetCursor(Number(g_kcType === `Replaced`));
+				changeConfigCursor(0);
 				keyconSprite.scrollLeft = - maxLeftX;
 			}
 		}, g_lblPosObj.btnKcReset, g_cssObj.button_Reset),
@@ -6254,12 +6753,13 @@ const keyConfigInit = (_kcType = g_kcType) => {
 
 		// 全角切替、BackSpace、Deleteキー、Escキーは割り当て禁止
 		// また、直前と同じキーを押した場合(BackSpaceを除く)はキー操作を無効にする
-		const disabledKeys = [229, 240, 242, 243, 244, 91, 29, 28, 27, g_prevKey];
+		const disabledKeys = [229, 240, 242, 243, 244, 91, 29, 28, 27, 259, g_prevKey];
 		if (disabledKeys.includes(setKey) || g_kCdN[setKey] === undefined) {
 			makeInfoWindow(g_msgInfoObj.I_0002, `fadeOut0`);
 			return;
 		} else if ((setKey === C_KEY_TITLEBACK && g_currentk === 0) ||
-			(keyIsDown(g_kCdNameObj.metaKey) && keyIsDown(g_kCdNameObj.shiftKey))) {
+			((keyIsDown(g_kCdNameObj.metaLKey) || keyIsDown(g_kCdNameObj.metaRKey)) &&
+				(keyIsDown(g_kCdNameObj.shiftLKey) || keyIsDown(g_kCdNameObj.shiftRKey)))) {
 			return;
 		}
 
@@ -6286,20 +6786,8 @@ const keyConfigInit = (_kcType = g_kcType) => {
 			g_currentk++;
 			cursor.style.top = `${parseInt(cursor.style.top) + C_KYC_REPHEIGHT}px`;
 
-		} else if (g_currentj < keyNum - 1) {
-			// 他の代替キーが存在せず、次の矢印がある場合
-			g_currentj++;
-			g_currentk = 0;
-
-			// 代替キーのみの場合は次の代替キーがあるキーを探す
-			if (g_kcType === `Replaced`) {
-				searchNextCursor(1);
-			}
-			setKeyConfigCursor();
-
 		} else {
-			// 全ての矢印・代替キーの巡回が終わった場合は元の位置に戻す
-			resetCursor(Number(g_kcType === `Replaced`));
+			changeConfigCursor();
 		}
 	});
 
@@ -6312,23 +6800,26 @@ const keyConfigInit = (_kcType = g_kcType) => {
  * 影矢印色の取得
  * @param {number} _colorPos 
  * @param {string} _arrowColor 
- * @returns 
  */
 const getShadowColor = (_colorPos, _arrowColor) => g_headerObj.setShadowColor[_colorPos] === `Default` ?
 	_arrowColor : g_headerObj.setShadowColor[_colorPos];
 
 /**
  * キー数基礎情報の取得
- * @returns 
  */
 const getKeyInfo = _ => {
 	const keyCtrlPtn = `${g_keyObj.currentKey}_${g_keyObj.currentPtn}`;
-	const keyNum = g_keyObj[`chara${keyCtrlPtn}`].length;
+	const keyNum = g_keyObj[`${g_keyObj.defaultProp}${keyCtrlPtn}`].length;
 	const posMax = (g_keyObj[`divMax${keyCtrlPtn}`] !== undefined ?
-		g_keyObj[`divMax${keyCtrlPtn}`] : g_keyObj[`pos${keyCtrlPtn}`][keyNum - 1] + 1);
+		g_keyObj[`divMax${keyCtrlPtn}`] : Math.max(...g_keyObj[`pos${keyCtrlPtn}`]) + 1);
 	const divideCnt = g_keyObj[`div${keyCtrlPtn}`] - 1;
+	const keyGroupMaps = setVal(g_keyObj[`keyGroup${keyCtrlPtn}`], [...Array(keyNum)].fill([`0`]), C_TYP_STRING);
+	const keyGroupList = makeDedupliArray(keyGroupMaps.flat()).sort((a, b) => parseInt(a) - parseInt(b));
 
-	return { keyCtrlPtn: keyCtrlPtn, keyNum: keyNum, posMax: posMax, divideCnt: divideCnt };
+	return {
+		keyCtrlPtn: keyCtrlPtn, keyNum: keyNum, posMax: posMax, divideCnt: divideCnt,
+		keyGroupMaps: keyGroupMaps, keyGroupList: keyGroupList,
+	};
 };
 
 /**
@@ -6353,12 +6844,12 @@ const changeSetColor = _ => {
 		'Shadow': (isDefault ? defaultType : `${scoreIdHeader}Default`),
 	};
 	Object.keys(currentTypes).forEach(pattern => {
-		g_headerObj[`set${pattern}Color`] = copyArray2d(g_headerObj[`set${pattern}Color${currentTypes[pattern]}`]);
+		g_headerObj[`set${pattern}Color`] = structuredClone(g_headerObj[`set${pattern}Color${currentTypes[pattern]}`]);
 		for (let j = 0; j < g_headerObj.setColorInit.length; j++) {
-			g_headerObj[`frz${pattern}Color`][j] = copyArray2d(g_headerObj[`frz${pattern}Color${currentTypes[pattern]}`][j]);
+			g_headerObj[`frz${pattern}Color`][j] = structuredClone(g_headerObj[`frz${pattern}Color${currentTypes[pattern]}`][j]);
 		}
 		if (!isDefault) {
-			g_headerObj[`set${pattern}Color`] = copyArray2d(g_headerObj[`set${pattern}Color${g_colorType}`]);
+			g_headerObj[`set${pattern}Color`] = structuredClone(g_headerObj[`set${pattern}Color${g_colorType}`]);
 		}
 	});
 
@@ -6452,7 +6943,7 @@ const loadMusic = _ => {
 			lblLoading.textContent = g_lblNameObj.pleaseWait;
 			setAudio(blobUrl);
 		} else {
-			makeWarningWindow(`${g_msgInfoObj.E_0032}<br>(${request.status} ${request.statusText})`, { backBtnUse: true });
+			makeWarningWindow(`${g_msgInfoObj.E_0041.split('{0}').join(getFullPath(musicUrl))}<br>(${request.status} ${request.statusText})`, { backBtnUse: true });
 		}
 	});
 
@@ -6571,6 +7062,7 @@ const loadingScoreInit = async () => {
 	await loadChartFile();
 	const tkObj = getKeyInfo();
 	const [keyCtrlPtn, keyNum] = [tkObj.keyCtrlPtn, tkObj.keyNum];
+	g_headerObj.blankFrameDef = setVal(g_headerObj.blankFrameDefs[g_stateObj.scoreId], g_headerObj.blankFrameDefs[0]);
 	g_headerObj.blankFrame = g_headerObj.blankFrameDef;
 
 	// ユーザカスタムイベント
@@ -6601,7 +7093,7 @@ const loadingScoreInit = async () => {
 
 	// Motionオプション適用時の矢印別の速度を取得（配列形式）
 	const motionOnFrame = setMotionOnFrame();
-	g_workObj.motionOnFrames = copyArray2d(motionOnFrame);
+	g_workObj.motionOnFrames = structuredClone(motionOnFrame);
 
 	// 最初のフレームで出現する矢印が、ステップゾーンに到達するまでのフレーム数を取得
 	const firstFrame = (g_scoreObj.frameNum === 0 ? 0 : g_scoreObj.frameNum + g_headerObj.blankFrame);
@@ -6610,15 +7102,13 @@ const loadingScoreInit = async () => {
 	// キーパターン(デフォルト)に対応する矢印番号を格納
 	convertReplaceNums();
 
-	const setData = (_data, _minLength = 1) => {
-		return (hasArrayList(_data, _minLength) ? _data.concat() : []);
-	};
+	const setData = (_data, _minLength = 1) => hasArrayList(_data, _minLength) ? _data.concat() : [];
 
 	// フレーム・曲開始位置調整
 	let preblankFrame = 0;
 	if (g_scoreObj.frameNum === 0) {
-		if (firstArrowFrame - C_MAX_ADJUSTMENT < arrivalFrame) {
-			preblankFrame = arrivalFrame - firstArrowFrame + C_MAX_ADJUSTMENT;
+		if (firstArrowFrame - g_limitObj.adjustment < arrivalFrame) {
+			preblankFrame = arrivalFrame - firstArrowFrame + g_limitObj.adjustment;
 
 			// 譜面データの再読み込み
 			const noteExistObj = {
@@ -6631,14 +7121,13 @@ const loadingScoreInit = async () => {
 			for (let j = 0; j < keyNum; j++) {
 				Object.keys(noteExistObj).forEach(name => {
 					if (tmpObj[`${name}Data`][j] !== undefined && noteExistObj[name]) {
-						g_scoreObj[`${name}Data`][j] = copyArray2d(tmpObj[`${name}Data`][j]);
+						g_scoreObj[`${name}Data`][j] = structuredClone(tmpObj[`${name}Data`][j]);
 					}
 				});
 			}
 
-			Object.keys(g_dataMinObj).forEach(dataType => {
-				g_scoreObj[`${dataType}Data`] = setData(tmpObj[`${dataType}Data`], g_dataMinObj[dataType]);
-			});
+			Object.keys(g_dataMinObj).forEach(dataType =>
+				g_scoreObj[`${dataType}Data`] = setData(tmpObj[`${dataType}Data`], g_dataMinObj[dataType]));
 
 			lastFrame += preblankFrame;
 			firstArrowFrame += preblankFrame;
@@ -6750,7 +7239,7 @@ const applyShuffle = (_keyNum, _shuffleGroup, _style) => {
 
 	// indexに従って並べ替え
 	g_typeLists.arrow.forEach(type => {
-		const tmpData = copyArray2d(g_scoreObj[`${type}Data`]);
+		const tmpData = structuredClone(g_scoreObj[`${type}Data`]);
 		for (let i = 0; i < _keyNum; i++) {
 			g_scoreObj[`${type}Data`][i] = tmpData[index[i]] || [];
 		}
@@ -6762,19 +7251,45 @@ const applyShuffle = (_keyNum, _shuffleGroup, _style) => {
  * @param {number} _keyNum
  * @param {array} _shuffleGroup
  */
-const applyMirror = (_keyNum, _shuffleGroup, _asymFlg = false) => {
+const applyMirror = (_keyNum, _shuffleGroup, _swapFlg = false) => {
+
 	// シャッフルグループごとにミラー
-	const style = copyArray2d(_shuffleGroup).map(_group => _group.reverse());
-	if (_asymFlg) {
-		// グループが4の倍数のとき、4n+1, 4n+2のみ入れ替える
-		style.forEach((group, i) => {
-			if (group.length % 4 === 0) {
-				for (let k = 0; k < group.length / 4; k++) {
-					[style[i][4 * k + 1], style[i][4 * k + 2]] = [style[i][4 * k + 2], style[i][4 * k + 1]];
-				}
+	const style = structuredClone(_shuffleGroup).map(_group => _group.reverse());
+	let swapUseFlg = false;
+
+	// X-Mirror作成用の入れ替え関数
+	// グループが4の倍数のとき、4n+1, 4n+2のみ入れ替える
+	const swapGroupNums = (_group, _i, _divideNum) => {
+		if (_group.length % _divideNum === 0) {
+			swapUseFlg = true;
+			for (let k = 0; k < _group.length / _divideNum; k++) {
+				const swap1 = Math.floor(_divideNum * (k + 1 / 2) - 1);
+				const swap2 = Math.ceil(_divideNum * (k + 1 / 2));
+				[style[_i][swap1], style[_i][swap2]] = [style[_i][swap2], style[_i][swap1]];
 			}
-		});
+		}
+	};
+
+	if (_swapFlg) {
+		style.forEach((group, i) => g_settings.swapPattern.forEach(val => swapGroupNums(group, i, val)));
+		if (!swapUseFlg) {
+			g_stateObj.shuffle = `Mirror`;
+		}
 	}
+	applyShuffle(_keyNum, _shuffleGroup, style);
+};
+
+/**
+ * Turningの適用
+ * @param {number} _keyNum 
+ * @param {array} _shuffleGroup 
+ */
+const applyTurning = (_keyNum, _shuffleGroup) => {
+	const mirrorOrNot = _array => Math.random() >= 0.5 ? _array.reverse() : _array;
+	const style = structuredClone(_shuffleGroup).map(_group => {
+		const startNum = Math.floor(Math.random() * (_group.length - 1)) + 1;
+		return mirrorOrNot(makeDedupliArray(_group.slice(startNum), _group.slice(0, startNum)));
+	});
 	applyShuffle(_keyNum, _shuffleGroup, style);
 };
 
@@ -6785,12 +7300,10 @@ const applyMirror = (_keyNum, _shuffleGroup, _asymFlg = false) => {
  */
 const applyRandom = (_keyNum, _shuffleGroup) => {
 	// シャッフルグループごとにシャッフル(Fisher-Yates)
-	const style = copyArray2d(_shuffleGroup).map(_group => {
+	const style = structuredClone(_shuffleGroup).map(_group => {
 		for (let i = _group.length - 1; i > 0; i--) {
 			const random = Math.floor(Math.random() * (i + 1));
-			const tmp = _group[i];
-			_group[i] = _group[random];
-			_group[random] = tmp;
+			[_group[i], _group[random]] = [_group[random], _group[i]];
 		}
 		return _group;
 	});
@@ -6869,7 +7382,7 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 	const obj = {};
 
 	const scoreIdHeader = setScoreIdHeader(_scoreId, g_stateObj.scoreLockFlg);
-	const keyNum = g_keyObj[`chara${_keyCtrlPtn}`].length;
+	const keyNum = g_keyObj[`${g_keyObj.defaultProp}${_keyCtrlPtn}`].length;
 	obj.arrowData = [];
 	obj.frzData = [];
 	obj.dummyArrowData = [];
@@ -6888,22 +7401,8 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 	 * 矢印データの格納
 	 * @param {string} _data 
 	 */
-	const storeArrowData = _data => {
-		let arrowData = [];
-
-		if (hasVal(_data)) {
-			const tmpData = splitLF(_data).join(``);
-			if (tmpData !== undefined) {
-				arrowData = tmpData.split(`,`);
-				if (isNaN(parseFloat(arrowData[0]))) {
-					return [];
-				} else {
-					arrowData = arrowData.map(data => calcFrame(data)).sort((_a, _b) => _a - _b);
-				}
-			}
-		}
-		return arrowData;
-	};
+	const storeArrowData = _data => hasVal(_data) ?
+		splitLF(_data)?.join(``).split(`,`).filter(data => !isNaN(parseFloat(data))).map(data => calcFrame(data)).sort((_a, _b) => _a - _b) : [];
 
 	for (let j = 0; j < keyNum; j++) {
 
@@ -6936,10 +7435,11 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 	 * @param {string} _footer 
 	 */
 	const setSpeedData = (_header, _scoreNo, _footer = `_data`) => {
+		const dosSpeedData = getRefData(_header, `${_scoreNo}${_footer}`);
 		const speedData = [];
 
-		if (hasVal(_dosObj[`${_header}${_scoreNo}${_footer}`]) && g_stateObj.d_speed === C_FLG_ON) {
-			const tmpArrayData = splitLF(_dosObj[`${_header}${_scoreNo}${_footer}`]);
+		if (hasVal(dosSpeedData) && g_stateObj.d_speed === C_FLG_ON) {
+			const tmpArrayData = splitLF(dosSpeedData);
 
 			tmpArrayData.filter(data => hasVal(data)).forEach(tmpData => {
 				const tmpSpeedData = tmpData.split(`,`);
@@ -6963,7 +7463,6 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 	/**
 	 * 個別・全体色変化データをマージして整列し、単純配列として返却
 	 * @param {string} _header 
-	 * @returns 
 	 */
 	const mergeColorData = (_header = ``) => {
 		if (obj[`color${_header}Data`] === undefined) return [];
@@ -6978,11 +7477,12 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 	 * @param {number} _scoreNo 
 	 */
 	const setColorData = (_header, _scoreNo) => {
+		const dosColorData = getRefData(_header, `${_scoreNo}_data`);
 		const colorData = [];
 		const allFlg = (_header.charAt(0) === `a`);
 
-		if (hasVal(_dosObj[`${_header}${_scoreNo}_data`]) && g_stateObj.d_color === C_FLG_ON) {
-			const tmpArrayData = splitLF(_dosObj[`${_header}${_scoreNo}_data`]);
+		if (hasVal(dosColorData) && g_stateObj.d_color === C_FLG_ON) {
+			const tmpArrayData = splitLF(dosColorData);
 
 			tmpArrayData.filter(data => hasVal(data)).forEach(tmpData => {
 				const tmpColorData = tmpData.split(`,`);
@@ -7011,7 +7511,7 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 	 * @param {number} _scoreNo 
 	 */
 	const setCssMotionData = (_header, _scoreNo) => {
-		const dosCssMotionData = _dosObj[`${_header}Motion${_scoreNo}_data`] || _dosObj[`${_header}Motion_data`];
+		const dosCssMotionData = getRefData(`${_header}Motion`, `${_scoreNo}_data`) || _dosObj[`${_header}Motion_data`];
 		const cssMotionData = [];
 
 		if (hasVal(dosCssMotionData) && g_stateObj.d_arroweffect === C_FLG_ON) {
@@ -7033,18 +7533,82 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 	};
 
 	/**
+	 * スクロール変化データの分解
+	 * @param {number} _scoreNo 
+	 */
+	const setScrollchData = (_scoreNo) => {
+		const dosScrollchData = getRefData(`scrollch`, `${_scoreNo}_data`) || _dosObj.scrollch_data;
+		const scrollchData = [];
+
+		if (hasVal(dosScrollchData)) {
+			splitLF(dosScrollchData).filter(data => hasVal(data)).forEach(tmpData => {
+				const tmpScrollchData = tmpData.split(`,`);
+				if (isNaN(parseInt(tmpScrollchData[0]))) {
+					return;
+				}
+				const frame = calcFrame(tmpScrollchData[0]);
+				const arrowNum = parseFloat(tmpScrollchData[1]);
+				const scrollDir = parseFloat(tmpScrollchData[2] ?? `1`);
+
+				scrollchData.push([frame, arrowNum, frame, scrollDir]);
+			});
+			return scrollchData.sort((_a, _b) => _a[0] - _b[0]).flat();
+		}
+		return [];
+	};
+
+	/**
+	 * 譜面データに別の関連名が含まれていた場合、関連名の変数を返す
+	 * 例) |backA2_data=back_data| -> back_dataで定義された値を使用
+	 * @param {string} _header 
+	 * @param {string} _dataName 
+	 */
+	const getRefData = (_header, _dataName) => {
+		const data = _dosObj[`${_header}${_dataName}`];
+		return data?.startsWith(_header) ? _dosObj[data] : data;
+	}
+
+	/**
 	 * 譜面データの優先順配列の取得
 	 * @param {string} _header 
 	 * @param {string} _type 
 	 * @param {number} _scoreNo 
-	 * @returns 
 	 */
 	const getPriorityList = (_header, _type, _scoreNo) => [
-		_dosObj[`${_header}${_type}${g_localeObj.val}${_scoreNo}_data`],
-		_dosObj[`${_header}${_type}${g_localeObj.val}_data`],
-		_dosObj[`${_header}${_type}${_scoreNo}_data`],
-		_dosObj[`${_header}${_type}_data`]
+		getRefData(_header, `${_type}${g_localeObj.val}${_scoreNo}_data`),
+		getRefData(_header, `${_type}${g_localeObj.val}_data`),
+		getRefData(_header, `${_type}${_scoreNo}_data`),
+		getRefData(_header, `${_type}_data`)
 	];
+
+	/**
+	 * 歌詞表示、背景・マスクデータの優先順取得 
+	 */
+	const getPriorityHeader = (_defaultHeaders = []) => {
+		if (_defaultHeaders.length > 0) {
+			return makeDedupliArray(_defaultHeaders);
+		}
+
+		const list = [];
+		const anotherKeyFlg = hasVal(g_keyObj[`transKey${_keyCtrlPtn}`]);
+		let type = ``;
+		if (g_stateObj.scroll !== `---`) {
+			type = `Alt`;
+		} else if (g_stateObj.reverse === C_FLG_ON) {
+			type = `Rev`;
+		}
+
+		if (anotherKeyFlg) {
+			list.push(`${g_stateObj.scroll}A`);
+			list.push(`${type}A`);
+			list.push(`A`);
+		}
+		list.push(g_stateObj.scroll);
+		list.push(type);
+		list.push(``);
+
+		return makeDedupliArray(list);
+	};
 
 	/**
 	 * 歌詞データの分解
@@ -7055,11 +7619,9 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 		let wordReverseFlg = false;
 		const divideCnt = getKeyInfo().divideCnt;
 		const addDataList = (_type = ``) => wordDataList.push(...getPriorityList(`word`, _type, _scoreNo));
+		getPriorityHeader().forEach(val => addDataList(val));
 
-		if (g_stateObj.scroll !== `---`) {
-			addDataList(`Alt`);
-		} else if (g_stateObj.reverse === C_FLG_ON) {
-			addDataList(`Rev`);
+		if (g_stateObj.reverse === C_FLG_ON) {
 
 			// wordRev_dataが指定されている場合はそのままの位置を採用
 			// word_dataのみ指定されている場合、下記ルールに従って設定
@@ -7072,7 +7634,6 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 				}
 			}
 		}
-		addDataList();
 
 		const inputWordData = wordDataList.find((v) => v !== undefined);
 		return (inputWordData !== undefined ? makeSpriteWordData(inputWordData, wordReverseFlg) : [[], -1]);
@@ -7114,17 +7675,17 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 					wordMaxDepth = tmpWordData[k + 1];
 				}
 
-				let addFrame = 0;
-				[wordData[tmpWordData[k]], addFrame] =
+				let dataCnts = 0;
+				[wordData[tmpWordData[k]], dataCnts] =
 					checkDuplicatedObjects(wordData[tmpWordData[k]]);
 
 				if (tmpWordData.length > 3 && tmpWordData.length < 6) {
 					tmpWordData[3] = setIntVal(tmpWordData[3], C_WOD_FRAME);
-					wordData[tmpWordData[0]][addFrame].push(tmpWordData[1],
+					wordData[tmpWordData[0]][dataCnts].push(tmpWordData[1],
 						escapeHtmlForEnabledTag(tmpWordData[2]), tmpWordData[3]);
 					break;
 				} else {
-					wordData[tmpWordData[k]][addFrame].push(tmpWordData[k + 1],
+					wordData[tmpWordData[k]][dataCnts].push(tmpWordData[k + 1],
 						escapeHtmlForEnabledTag(tmpWordData[k + 2] ?? ``));
 				}
 			}
@@ -7134,41 +7695,19 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 	};
 
 	/**
-	 * 背景・マスクデータの分解
+	 * 背景・マスク、スキン変更データの分解
 	 * @param {string} _header 
-	 * @param {string} _scoreNo
+	 * @param {string} _scoreNo 譜面番号
+	 * @param {array} resultTypes リザルトモーションの種類 (result, failedB, failedS)
 	 */
-	const makeBackgroundData = (_header, _scoreNo) => {
+	const makeBackgroundData = (_header, _scoreNo, { resultTypes = [] } = {}) => {
 		const dataList = [];
+		const calcFrameFunc = resultTypes.length > 0 ? undefined : calcFrame;
 		const addDataList = (_type = ``) => dataList.push(...getPriorityList(_header, _type, _scoreNo));
-
-		if (g_stateObj.scroll !== `---`) {
-			addDataList(`Alt`);
-		} else if (g_stateObj.reverse === C_FLG_ON) {
-			addDataList(`Rev`);
-		}
-		addDataList();
+		getPriorityHeader(resultTypes).forEach(val => addDataList(val));
 
 		const data = dataList.find((v) => v !== undefined);
-		return (data !== undefined ? makeSpriteData(data, calcFrame) : [[], -1]);
-	};
-
-	/**
-	 * リザルトモーションデータ(結果画面用背景・マスクデータ)の分解
-	 * @param {string} _header 
-	 * @param {string} _scoreNo 
-	 * @param {string} _defaultHeader 
-	 */
-	const makeBackgroundResultData = (_header, _scoreNo, _defaultHeader = ``) => {
-		const dataList = [];
-		const addResultDataList = _headerType => dataList.push(...getPriorityList(``, _headerType, _scoreNo));
-		addResultDataList(_header);
-		if (_defaultHeader !== ``) {
-			addResultDataList(_defaultHeader);
-		}
-
-		const data = dataList.find((v) => v !== undefined);
-		return (data !== undefined ? makeSpriteData(data) : [[], -1]);
+		return (data !== undefined ? g_animationFunc.make[_header](data, calcFrameFunc) : [[], -1]);
 	};
 
 	// 速度変化データの分解 (2つで1セット)
@@ -7207,6 +7746,9 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 		obj.dummyFrzCssMotionData = setCssMotionData(`frz`, _dummyNo);
 	}
 
+	// スクロール変化データの分解
+	obj.scrollchData = setScrollchData(scoreIdHeader);
+
 	// 歌詞データの分解 (3つで1セット, セット毎の改行区切り可)
 	obj.wordData = [];
 	obj.wordMaxDepth = -1;
@@ -7215,34 +7757,38 @@ const scoreConvert = (_dosObj, _scoreId, _preblankFrame, _dummyNo = ``,
 		[obj.wordData, obj.wordMaxDepth] = makeWordData(scoreIdHeader);
 	}
 
-	// 背景・マスクデータの分解 (下記すべてで1セット、改行区切り)
-	// [フレーム数, 階層, 背景パス, class(CSSで別定義), X, Y, width, height, opacity, animationName, animationDuration]
-	obj.maskData = [];
-	obj.maskMaxDepth = -1;
-	obj.backData = [];
-	obj.backMaxDepth = -1;
-	if (g_stateObj.d_background === C_FLG_OFF) {
-	} else {
-		g_animationData.forEach(sprite => {
-			[obj[`${sprite}Data`], obj[`${sprite}MaxDepth`]] = makeBackgroundData(sprite, scoreIdHeader);
-		});
-	}
+	// 背景・マスク・スキン変更データの分解 (下記すべてで1セット、改行区切り)
+	// - 背景・マスク: [フレーム数, 階層, 背景パス, class(CSSで別定義), X, Y, width, height, opacity, animationName, animationDuration, animationFillMode]
+	// - スキン変更  : [フレーム数, CSSカスタムプロパティ名, 設定内容]
+	g_animationData.forEach(sprite => {
+		obj[`${sprite}Data`] = [];
+		obj[`${sprite}MaxDepth`] = -1;
 
-	// 結果画面用・背景/マスクデータの分解 (下記すべてで1セット、改行区切り)
-	// [フレーム数,階層,背景パス,class(CSSで別定義),X,Y,width,height,opacity,animationName,animationDuration]
-	if (g_stateObj.d_background === C_FLG_OFF && g_headerObj.resultMotionSet) {
-		const backgroundResults = [`backResult`, `maskResult`, `backFailed`, `maskFailed`];
-		backgroundResults.forEach(backName => {
-			g_headerObj[`${backName}Data`] = [];
-			g_headerObj[`${backName}MaxDepth`] = -1;
-		});
-	} else {
-		g_animationData.forEach(sprite => {
+		if (g_stateObj.d_background === C_FLG_OFF) {
+		} else {
+			[obj[`${sprite}Data`], obj[`${sprite}MaxDepth`]] = makeBackgroundData(sprite, scoreIdHeader);
+		}
+
+		if (g_stateObj.d_background === C_FLG_OFF && g_headerObj.resultMotionSet) {
+			[`Result`, `Failed`].forEach(backName => {
+				g_headerObj[`${backName}Data`] = [];
+				g_headerObj[`${backName}MaxDepth`] = -1;
+			});
+		} else {
 			[g_headerObj[`${sprite}ResultData`], g_headerObj[`${sprite}ResultMaxDepth`]] =
-				makeBackgroundResultData(`${sprite}result`, scoreIdHeader);
+				makeBackgroundData(sprite, scoreIdHeader, { resultTypes: [`result`] });
 			[g_headerObj[`${sprite}FailedData`], g_headerObj[`${sprite}FailedMaxDepth`]] =
-				makeBackgroundResultData(`${sprite}failed${g_stateObj.lifeMode.slice(0, 1)}`, scoreIdHeader, `${sprite}result`);
-		});
+				makeBackgroundData(sprite, scoreIdHeader, { resultTypes: [`failed${g_stateObj.lifeMode.slice(0, 1)}`, `result`] });
+		}
+	});
+
+	// キー変化定義
+	obj.keychFrames = [0];
+	obj.keychTarget = [`0`];
+	if (hasVal(getRefData(`keych`, `${scoreIdHeader}_data`))) {
+		const keychdata = splitLF2(getRefData(`keych`, `${scoreIdHeader}_data`), `,`);
+		obj.keychFrames.push(...keychdata.filter((val, j) => j % 2 === 0));
+		obj.keychTarget.push(...keychdata.filter((val, j) => j % 2 === 1));
 	}
 
 	return obj;
@@ -7280,7 +7826,7 @@ const calcLifeVal = (_val, _allArrows) => Math.round(_val * g_headerObj.maxLifeV
 const getLastFrame = (_dataObj, _keyCtrlPtn = `${g_keyObj.currentKey}_${g_keyObj.currentPtn}`) => {
 
 	let tmpLastNum = 0;
-	const keyNum = g_keyObj[`chara${_keyCtrlPtn}`].length;
+	const keyNum = g_keyObj[`${g_keyObj.defaultProp}${_keyCtrlPtn}`].length;
 
 	for (let j = 0; j < keyNum; j++) {
 		const data = [
@@ -7307,7 +7853,7 @@ const getLastFrame = (_dataObj, _keyCtrlPtn = `${g_keyObj.currentKey}_${g_keyObj
 const getFirstArrowFrame = (_dataObj, _keyCtrlPtn = `${g_keyObj.currentKey}_${g_keyObj.currentPtn}`) => {
 
 	let tmpFirstNum = Infinity;
-	const keyNum = g_keyObj[`chara${_keyCtrlPtn}`].length;
+	const keyNum = g_keyObj[`${g_keyObj.defaultProp}${_keyCtrlPtn}`].length;
 
 	for (let j = 0; j < keyNum; j++) {
 		const data = [
@@ -7319,7 +7865,7 @@ const getFirstArrowFrame = (_dataObj, _keyCtrlPtn = `${g_keyObj.currentKey}_${g_
 
 		data.filter(data => hasVal(data)).forEach(_objData => {
 			if (_objData[0] !== ``) {
-				if (_objData[0] < tmpFirstNum && _objData[0] + C_MAX_ADJUSTMENT > 0) {
+				if (_objData[0] < tmpFirstNum && _objData[0] + g_limitObj.adjustment > 0) {
 					tmpFirstNum = _objData[0];
 				}
 			}
@@ -7377,7 +7923,6 @@ const setMotionOnFrame = _ => g_motionFunc[g_stateObj.motion]([...Array(g_sHeigh
  * @param {array} _frms 
  * @param {number} _spd 
  * @param {number} _pnFlg 正負(1 もしくは -1) 
- * @returns 
  */
 const getBoostTrace = (_frms, _spd, _pnFlg = 1) => {
 	for (let j = C_MOTION_STD_POS + 1; j < C_MOTION_STD_POS + 70; j++) {
@@ -7390,7 +7935,6 @@ const getBoostTrace = (_frms, _spd, _pnFlg = 1) => {
  * Brake用の適用関数
  * - 初期は+2x、ステップゾーンに近づくにつれて加速量を下げる (20 → 34)
  * @param {array} _frms 
- * @returns 
  */
 const getBrakeTrace = _frms => {
 	for (let j = C_MOTION_STD_POS + 5; j < C_MOTION_STD_POS + 19; j++) {
@@ -7466,7 +8010,7 @@ const pushArrows = (_dataObj, _speedOnFrame, _motionOnFrame, _firstArrivalFrame)
 				g_workObj[`mk${_header}Length`][_j][_k] = getFrzLength(_speedOnFrame, _data[_k], _data[_k + 1]);
 			}
 		} else if (_frzFlg && g_workObj[`mk${_header}Length`][_j] !== undefined) {
-			g_workObj[`mk${_header}Length`][_j] = copyArray2d(g_workObj[`mk${_header}Length`][_j].slice(_k + 2));
+			g_workObj[`mk${_header}Length`][_j] = structuredClone(g_workObj[`mk${_header}Length`][_j].slice(_k + 2));
 		}
 	};
 
@@ -7507,7 +8051,7 @@ const pushArrows = (_dataObj, _speedOnFrame, _motionOnFrame, _firstArrivalFrame)
 
 				// 出現位置が開始前の場合は除外
 				if (_frzFlg && g_workObj[`mk${camelHeader}Length`][_j] !== undefined) {
-					g_workObj[`mk${camelHeader}Length`][_j] = copyArray2d(g_workObj[`mk${camelHeader}Length`][_j].slice(k + 2));
+					g_workObj[`mk${camelHeader}Length`][_j] = structuredClone(g_workObj[`mk${camelHeader}Length`][_j].slice(k + 2));
 				}
 				break;
 
@@ -7557,34 +8101,35 @@ const pushArrows = (_dataObj, _speedOnFrame, _motionOnFrame, _firstArrivalFrame)
 	}
 
 	// 個別加速のタイミング更新
-	let tmpObj;
-	g_workObj.boostData = [];
-	g_workObj.boostData.length = 0;
-	if (hasArrayList(_dataObj.boostData, 2)) {
-		let delBoostIdx = 0;
-		for (let k = _dataObj.boostData.length - 2; k >= 0; k -= 2) {
-			tmpObj = getArrowStartFrame(_dataObj.boostData[k], _speedOnFrame, _motionOnFrame);
-			if (tmpObj.frm < g_scoreObj.frameNum) {
-				_dataObj.boostData[k] = g_scoreObj.frameNum;
-				delBoostIdx = k;
-				break;
-			} else {
-				_dataObj.boostData[k] = tmpObj.frm;
+	const getTimingData = _data => {
+		if (hasArrayList(_data, 2)) {
+			let delIdx = 0;
+			for (let k = _data.length - 2; k >= 0; k -= 2) {
+				const tmpObj = getArrowStartFrame(_data[k], _speedOnFrame, _motionOnFrame);
+				if (tmpObj.frm < g_scoreObj.frameNum) {
+					_data[k] = g_scoreObj.frameNum;
+					delIdx = k;
+					break;
+				} else {
+					_data[k] = tmpObj.frm;
+				}
 			}
+			for (let k = 0; k < delIdx; k++) {
+				_data.shift();
+			}
+			return structuredClone(_data);
 		}
-		for (let k = 0; k < delBoostIdx; k++) {
-			_dataObj.boostData.shift();
-		}
-		g_workObj.boostData = copyArray2d(_dataObj.boostData);
-	}
+		return [];
+	};
+	g_workObj.boostData = getTimingData(_dataObj.boostData);
 
 	/**
-	 * 色変化・モーションデータのタイミング更新
+	 * 色変化・モーションデータ・スクロール反転データのタイミング更新
+	 * - この関数を使用する場合、配列グループの先頭2つが「フレーム数、矢印番号」となっていないと動作しない
 	 * @param {string} _type 
 	 * @param {string} _header 
 	 * @param {function} _setFunc 
 	 * @param {object} obj _colorFlg: 個別色変化フラグ, _calcFrameFlg: 逆算を無条件で行うかどうかの可否
-	 * @returns 
 	 */
 	const calcDataTiming = (_type, _header, _setFunc = _ => true,
 		{ _term = 4, _colorFlg = false, _calcFrameFlg = false } = {}) => {
@@ -7600,6 +8145,7 @@ const pushArrows = (_dataObj, _speedOnFrame, _motionOnFrame, _firstArrivalFrame)
 			const calcFrameFlg = (_colorFlg && !isFrzHitColor(baseData[k + 1]) && !baseData[k + 3]) || _calcFrameFlg;
 
 			if (baseData[k] < g_scoreObj.frameNum) {
+				// フェードイン直前にある色変化・モーションデータ・スクロール反転データを取得して格納
 				if (!hasValInArray(baseData[k + 1], frontData)) {
 					frontData.unshift(baseData.slice(k + 1, k + _term));
 				}
@@ -7624,7 +8170,6 @@ const pushArrows = (_dataObj, _speedOnFrame, _motionOnFrame, _firstArrivalFrame)
 	 * 歌詞表示、背景・マスク表示のフェードイン時調整処理
 	 * @param {string} _type
 	 * @param {object} _data 
-	 * @returns 
 	 */
 	const calcAnimationData = (_type, _data) => {
 
@@ -7637,11 +8182,11 @@ const pushArrows = (_dataObj, _speedOnFrame, _motionOnFrame, _firstArrivalFrame)
 			(cgArrays.includes(_type) ? _data[startNum][_j][0] === _data[startNum][_k][0] :
 				_data[startNum][_j].depth === _data[startNum][_k].depth);
 
-		const fuzzyCheck = (_str, _list) => listMatching(_str, _list);
 		const isExceptData = {
-			word: (_exceptList, _j) => fuzzyCheck(_data[startNum][_j][1], _exceptList.word),
-			back: (_exceptList, _j) => fuzzyCheck(_data[startNum][_j].animationName, _exceptList.back),
-			mask: (_exceptList, _j) => fuzzyCheck(_data[startNum][_j].animationName, _exceptList.mask),
+			word: (_exceptList, _j) => listMatching(_data[startNum][_j][1], _exceptList.word),
+			back: (_exceptList, _j) => listMatching(_data[startNum][_j].animationName, _exceptList.back),
+			mask: (_exceptList, _j) => listMatching(_data[startNum][_j].animationName, _exceptList.mask),
+			style: (_exceptList, _j) => listMatching(_data[startNum][_j].depth, _exceptList.style),
 		};
 
 		const getLength = _list =>
@@ -7685,12 +8230,14 @@ const pushArrows = (_dataObj, _speedOnFrame, _motionOnFrame, _firstArrivalFrame)
 		return _data;
 	};
 
-	// 個別・全体色変化、モーションデータのタイミング更新
+	// 個別・全体色変化、モーションデータ・スクロール反転データのタイミング更新
 	[``, `dummy`].forEach(type =>
 		calcDataTiming(`color`, type, pushColors, { _colorFlg: true }));
 
 	g_typeLists.arrow.forEach(header =>
 		calcDataTiming(`cssMotion`, header, pushCssMotions, { _calcFrameFlg: true }));
+
+	calcDataTiming(`scrollch`, ``, pushScrollchs, { _calcFrameFlg: true });
 
 	g_fadeinStockList.forEach(type =>
 		_dataObj[`${type}Data`] = calcAnimationData(type, _dataObj[`${type}Data`]));
@@ -7698,7 +8245,6 @@ const pushArrows = (_dataObj, _speedOnFrame, _motionOnFrame, _firstArrivalFrame)
 
 	// 実際に処理させる途中変速配列を作成
 	g_workObj.speedData = [];
-	g_workObj.speedData.length = 0;
 	g_workObj.speedData.push(g_scoreObj.frameNum);
 	g_workObj.speedData.push(_speedOnFrame[g_scoreObj.frameNum]);
 
@@ -7926,6 +8472,48 @@ const pushCssMotions = (_header, _frame, _val, _styleName, _styleNameRev) => {
 };
 
 /**
+ * スクロール変化情報の格納
+ * @param {string} _header 
+ * @param {number} _frameArrow 
+ * @param {number} _frameStep 
+ * @param {number} _val 
+ * @param {number} _scrollDir 
+ */
+const pushScrollchs = (_header, _frameArrow, _val, _frameStep, _scrollDir) => {
+	const tkObj = getKeyInfo();
+
+	const frameArrow = Math.max(_frameArrow, g_scoreObj.frameNum);
+	const frameStep = Math.max(_frameStep, g_scoreObj.frameNum);
+
+	if (g_workObj.mkScrollchArrow[frameArrow] === undefined) {
+		g_workObj.mkScrollchArrow[frameArrow] = [];
+		g_workObj.mkScrollchArrowDir[frameArrow] = [];
+	}
+	if (g_workObj.mkScrollchStep[frameStep] === undefined) {
+		g_workObj.mkScrollchStep[frameStep] = [];
+		g_workObj.mkScrollchStepDir[frameStep] = [];
+	}
+	if (_val < 20 || _val >= 1000) {
+		const realVal = g_workObj.replaceNums[_val % 1000];
+		g_workObj.mkScrollchArrow[frameArrow].push(realVal);
+		g_workObj.mkScrollchArrowDir[frameArrow].push(_scrollDir);
+		g_workObj.mkScrollchStep[frameStep].push(realVal);
+		g_workObj.mkScrollchStepDir[frameStep].push(_scrollDir);
+
+	} else {
+		const colorNum = _val - 20;
+		for (let j = 0; j < tkObj.keyNum; j++) {
+			if (g_keyObj[`color${tkObj.keyCtrlPtn}`][j] === colorNum) {
+				g_workObj.mkScrollchArrow[frameArrow].push(j);
+				g_workObj.mkScrollchArrowDir[frameArrow].push(_scrollDir);
+				g_workObj.mkScrollchStep[frameStep].push(j);
+				g_workObj.mkScrollchStepDir[frameStep].push(_scrollDir);
+			}
+		}
+	}
+};
+
+/**
  * メイン画面前の初期化処理
  */
 const getArrowSettings = _ => {
@@ -7940,14 +8528,18 @@ const getArrowSettings = _ => {
 
 	g_workObj.stepX = [];
 	g_workObj.scrollDir = [];
+	g_workObj.scrollDirDefault = [];
 	g_workObj.dividePos = [];
-	g_workObj.stepRtn = copyArray2d(g_keyObj[`stepRtn${keyCtrlPtn}`]);
-	g_workObj.stepHitRtn = copyArray2d(g_keyObj[`stepRtn${keyCtrlPtn}`]);
-	g_workObj.arrowRtn = copyArray2d(g_keyObj[`stepRtn${keyCtrlPtn}`]);
-	g_workObj.keyCtrl = copyArray2d(g_keyObj[`keyCtrl${keyCtrlPtn}`]);
+	g_workObj.stepRtn = structuredClone(g_keyObj[`stepRtn${keyCtrlPtn}`]);
+	g_workObj.stepHitRtn = structuredClone(g_keyObj[`stepRtn${keyCtrlPtn}`]);
+	g_workObj.arrowRtn = structuredClone(g_keyObj[`stepRtn${keyCtrlPtn}`]);
+	g_workObj.keyCtrl = structuredClone(g_keyObj[`keyCtrl${keyCtrlPtn}`]);
 	g_workObj.diffList = [];
 	g_workObj.diffListR = [];
 	g_workObj.mainEndTime = 0;
+
+	g_workObj.keyGroupMaps = tkObj.keyGroupMaps;
+	g_workObj.keyGroupList = tkObj.keyGroupList;
 
 	const keyCtrlLen = g_workObj.keyCtrl.length;
 	g_workObj.keyCtrlN = [...Array(keyCtrlLen)].map(_ => []);
@@ -7985,6 +8577,7 @@ const getArrowSettings = _ => {
 		g_keyObj[`scrollDir${keyCtrlPtn}`][g_stateObj.scroll] : [...Array(keyNum)].fill(1));
 
 	g_stateObj.autoAll = (g_stateObj.autoPlay === C_FLG_ALL ? C_FLG_ON : C_FLG_OFF);
+	g_workObj.hitPosition = (g_stateObj.autoAll ? 0 : g_stateObj.hitPosition);
 	changeSetColor();
 
 	for (let j = 0; j < keyNum; j++) {
@@ -8009,6 +8602,7 @@ const getArrowSettings = _ => {
 			});
 		});
 	}
+	g_workObj.scrollDirDefault = g_workObj.scrollDir.concat();
 
 	Object.keys(g_resultObj).forEach(judgeCnt => g_resultObj[judgeCnt] = 0);
 	g_resultObj.spState = ``;
@@ -8022,18 +8616,20 @@ const getArrowSettings = _ => {
 	g_gameOverFlg = false;
 	g_finishFlg = true;
 
+	if (g_stateObj.dataSaveFlg) {
+		// ローカルストレージへAdjustment, HitPosition, Volume設定を保存
+		g_storeSettings.forEach(setting => g_localStorage[setting] = g_stateObj[setting]);
+		localStorage.setItem(g_localStorageUrl, JSON.stringify(g_localStorage));
+	}
+
 	// リバース、キーコンフィグなどをローカルストレージへ保存（Data Save: ON かつ別キーモードで無い場合) 
 	if (g_stateObj.dataSaveFlg && !hasVal(g_keyObj[`transKey${keyCtrlPtn}`])) {
 
 		// 次回キーコンフィグ画面へ戻ったとき、保存済みキーコンフィグ設定が表示されるようにする
 		g_keyObj.prevKey = `Dummy`;
 
-		// ローカルストレージへAdjustment, Volume, Display関連設定を保存
-		g_localStorage.adjustment = g_stateObj.adjustment;
-		g_localStorage.volume = g_stateObj.volume;
+		// ローカルストレージへcolorType設定を保存
 		g_localStorage.colorType = g_colorType;
-
-		g_storeSettings.forEach(setting => g_localStorage[setting] = g_stateObj[setting]);
 
 		let storageObj = g_localKeyStorage;
 		let addKey = ``;
@@ -8047,7 +8643,7 @@ const getArrowSettings = _ => {
 		storageObj[`keyCtrl${addKey}`] = setKeyCtrl(g_localKeyStorage, keyNum, keyCtrlPtn);
 		if (g_keyObj.currentPtn !== -1) {
 			storageObj[`keyCtrlPtn${addKey}`] = g_keyObj.currentPtn;
-			g_keyObj[`keyCtrl${keyCtrlPtn}`] = copyArray2d(g_keyObj[`keyCtrl${keyCtrlPtn}d`]);
+			g_keyObj[`keyCtrl${keyCtrlPtn}`] = structuredClone(g_keyObj[`keyCtrl${keyCtrlPtn}d`]);
 		}
 
 		// カラーセットの保存（キー別）
@@ -8124,9 +8720,6 @@ const mainInit = _ => {
 	const divRoot = document.querySelector(`#divRoot`);
 	document.oncontextmenu = _ => false;
 	g_currentPage = `main`;
-	
-	g_barNo = 0;
-	g_deleteNo = 0;
 
 	g_currentArrows = 0;
 	const wordMaxLen = g_scoreObj.wordMaxDepth + 1;
@@ -8158,11 +8751,11 @@ const mainInit = _ => {
 	// カラー・モーションを適用するオブジェクトの種類
 	const objList = (g_stateObj.dummyId === `` ? [``] : [`dummy`, ``]);
 
-	// 背景・マスクモーション(0フレーム指定)
+	// 背景・マスクモーション、スキン変更(0フレーム指定)
 	if (g_scoreObj.frameNum === 0) {
 		g_animationData.forEach(sprite => {
 			if (g_scoreObj[`${sprite}Data`][0] !== undefined) {
-				drawMainSpriteData(0, sprite);
+				g_animationFunc.drawMain[sprite](0, sprite);
 				g_scoreObj[`${sprite}Data`][0] = undefined;
 			}
 		});
@@ -8175,7 +8768,8 @@ const mainInit = _ => {
 	const dummyFrzCnts = [...Array(keyNum)].fill(0);
 	let speedCnts = 0;
 	let boostCnts = 0;
-	const stepZoneDisp = (g_stateObj.d_stepzone === C_FLG_OFF || g_stateObj.scroll === `Flat`) ? C_DIS_NONE : C_DIS_INHERIT;
+	let keychCnts = 0;
+	const stepZoneDisp = (g_stateObj.d_stepzone === C_FLG_OFF || g_settings.scrollFlat.includes(g_stateObj.scroll)) ? C_DIS_NONE : C_DIS_INHERIT;
 
 	for (let j = 0; j < keyNum; j++) {
 		const colorPos = g_keyObj[`color${keyCtrlPtn}`][j];
@@ -8195,6 +8789,8 @@ const mainInit = _ => {
 				}, g_cssObj.main_objStepShadow)
 			);
 		}
+
+		appearStepZone(j, C_DIS_NONE);
 
 		// ステップゾーン
 		multiAppend(stepRoot,
@@ -8216,14 +8812,17 @@ const mainInit = _ => {
 
 		);
 	}
-	if (g_stateObj.scroll === `Flat` && g_stateObj.d_stepzone === C_FLG_ON) {
+	if (g_settings.scrollFlat.includes(g_stateObj.scroll) && g_stateObj.d_stepzone === C_FLG_ON) {
+
+		// スクロール名に`R-`が含まれていればリバースと見做す
+		const reverseFlg = g_stateObj.reverse === C_FLG_ON || g_stateObj.scroll.startsWith(`R-`);
 
 		// ステップゾーンの代わり
 		const lineY = [(C_ARW_WIDTH - g_stateObj.flatStepHeight) / 2, (C_ARW_WIDTH + g_stateObj.flatStepHeight) / 2];
 		lineY.forEach((y, j) => {
 			mainSprite.appendChild(
 				createColorObject2(`stepBar${j}`, {
-					x: 0, y: C_STEP_Y + g_posObj.reverseStepY * Number(g_stateObj.reverse === C_FLG_ON) + y,
+					x: 0, y: C_STEP_Y + g_posObj.reverseStepY * Number(reverseFlg) + y,
 					w: g_headerObj.playingWidth - 50, h: 1, styleName: `lifeBar`,
 				}, g_cssObj.life_Failed)
 			);
@@ -8249,8 +8848,8 @@ const mainInit = _ => {
 
 	// 矢印・フリーズアロー描画スプライト（ステップゾーンの上に配置）
 	const arrowSprite = [
-		createEmptySprite(mainSprite, `arrowSprite0`, { w: g_headerObj.playingWidth, h: g_posObj.arrowHeight }),
-		createEmptySprite(mainSprite, `arrowSprite1`, { w: g_headerObj.playingWidth, h: g_posObj.arrowHeight }),
+		createEmptySprite(mainSprite, `arrowSprite0`, { y: g_workObj.hitPosition, w: g_headerObj.playingWidth, h: g_posObj.arrowHeight }),
+		createEmptySprite(mainSprite, `arrowSprite1`, { y: -g_workObj.hitPosition, w: g_headerObj.playingWidth, h: g_posObj.arrowHeight }),
 	];
 
 	// Appearanceのオプション適用時は一部描画を隠す
@@ -8369,7 +8968,7 @@ const mainInit = _ => {
 	const makerView = g_headerObj.makerView ? ` (${g_headerObj.creatorNames[g_stateObj.scoreId]})` : ``;
 	let difName = `[${getKeyName(g_headerObj.keyLabels[g_stateObj.scoreId])} / ${g_headerObj.difLabels[g_stateObj.scoreId]}${assistFlg}${shuffleName}${makerView}]`;
 	let creditName = `${musicTitle} / ${artistName}`;
-	if (checkMusicSiz(creditName, C_SIZ_MUSIC_TITLE) < 12) {
+	if (checkMusicSiz(creditName, g_limitObj.musicTitleSiz) < 12) {
 		creditName = `${musicTitle}`;
 		difName = `/ ${artistName} ` + difName;
 	}
@@ -8378,7 +8977,7 @@ const mainInit = _ => {
 
 		// ライフ（数字）
 		createDivCss2Label(`lblLife`, intLifeVal, {
-			x: 0, y: 30, w: 70, h: 20, siz: C_SIZ_JDGCNTS, display: g_workObj.lifegaugeDisp,
+			x: 0, y: 30, w: 70, h: 20, siz: g_limitObj.jdgCntsSiz, display: g_workObj.lifegaugeDisp,
 		}, lblInitColor),
 
 		// ライフ背景
@@ -8417,13 +9016,13 @@ const mainInit = _ => {
 		}, (g_stateObj.ratioType === `W-Ratio`) ? g_cssObj.common_ii : ((g_stateObj.ratioType === `Gauge`) ? g_cssObj.common_shakin : g_cssObj.common_uwan)),
 
 		// 曲名・アーティスト名表示
-		createDivCss2Label(`lblCredit`, creditName, Object.assign(g_lblPosObj.lblCredit, { siz: checkMusicSiz(creditName, C_SIZ_MUSIC_TITLE) })),
+		createDivCss2Label(`lblCredit`, creditName, Object.assign(g_lblPosObj.lblCredit, { siz: checkMusicSiz(creditName, g_limitObj.musicTitleSiz) })),
 
 		// 譜面名表示
 		createDivCss2Label(`lblDifName`, difName, Object.assign(g_lblPosObj.lblDifName, { siz: checkMusicSiz(difName, 12) })),
 
 		// 曲時間表示：現在時間
-		createDivCss2Label(`lblTime1`, `-:--.-`, Object.assign(g_lblPosObj.lblTime1, { display: g_workObj.musicinfoDisp })),
+		createDivCss2Label(`lblTime1`, `-:--`, Object.assign(g_lblPosObj.lblTime1, { display: g_workObj.musicinfoDisp })),
 
 		// 曲時間表示：総時間
 		createDivCss2Label(`lblTime2`, `/ ${fullTime}`, Object.assign(g_lblPosObj.lblTime2, { display: g_workObj.musicinfoDisp })),
@@ -8456,7 +9055,7 @@ const mainInit = _ => {
 		// キャラクタ表示
 		const charaJ = createDivCss2Label(`chara${jdg}`, ``, {
 			x: jdgX[j], y: jdgY[j],
-			w: C_LEN_JDGCHARA_WIDTH, h: C_LEN_JDGCHARA_HEIGHT, siz: C_SIZ_JDGCHARA,
+			w: g_limitObj.jdgCharaWidth, h: g_limitObj.jdgCharaHeight, siz: g_limitObj.jdgCharaSiz,
 			opacity: g_stateObj.opacity / 100, display: g_workObj.judgmentDisp,
 		}, g_cssObj.common_ii);
 		charaJ.setAttribute(`cnt`, 0);
@@ -8469,14 +9068,14 @@ const mainInit = _ => {
 			// コンボ表示
 			createDivCss2Label(`combo${jdg}`, ``, {
 				x: jdgX[j] + 170, y: jdgY[j],
-				w: C_LEN_JDGCHARA_WIDTH, h: C_LEN_JDGCHARA_HEIGHT, siz: C_SIZ_JDGCHARA,
+				w: g_limitObj.jdgCharaWidth, h: g_limitObj.jdgCharaHeight, siz: g_limitObj.jdgCharaSiz,
 				opacity: g_stateObj.opacity / 100, display: g_workObj.judgmentDisp,
-			}, g_cssObj[`common_${jdgCombos[j]}`]),
+			}, g_cssObj[`common_combo${jdg}`]),
 
 			// Fast/Slow表示
 			createDivCss2Label(`diff${jdg}`, ``, {
 				x: jdgX[j] + 170, y: jdgY[j] + 25,
-				w: C_LEN_JDGCHARA_WIDTH, h: C_LEN_JDGCHARA_HEIGHT, siz: C_SIZ_MAIN,
+				w: g_limitObj.jdgCharaWidth, h: g_limitObj.jdgCharaHeight, siz: g_limitObj.mainSiz,
 				opacity: g_stateObj.opacity / 100, display: g_workObj.fastslowDisp,
 			}, g_cssObj.common_combo),
 
@@ -8488,10 +9087,9 @@ const mainInit = _ => {
 		Ii: [`ii`, 0], Shakin: [`shakin`, 1], Matari: [`matari`, 2], Shobon: [`shobon`, 3], Uwan: [`uwan`, 4],
 		MCombo: [`combo`, 5], Kita: [`kita`, 7], Iknai: [`iknai`, 8], FCombo: [`combo`, 9],
 	};
-	Object.keys(jdgMainScoreObj).forEach(jdgScore => {
+	Object.keys(jdgMainScoreObj).forEach(jdgScore =>
 		infoSprite.appendChild(makeCounterSymbol(`lbl${jdgScore}`, g_headerObj.playingWidth - 110,
-			g_cssObj[`common_${jdgMainScoreObj[jdgScore][0]}`], jdgMainScoreObj[jdgScore][1] + 1, 0, g_workObj.scoreDisp));
-	});
+			g_cssObj[`common_${jdgMainScoreObj[jdgScore][0]}`], jdgMainScoreObj[jdgScore][1] + 1, 0, g_workObj.scoreDisp)));
 
 	// パーフェクト演出
 	judgeSprite.appendChild(createDivCss2Label(`finishView`, ``, g_lblPosObj.finishView, g_cssObj.common_kita));
@@ -8561,7 +9159,7 @@ const mainInit = _ => {
 	// キー操作イベント
 	document.onkeydown = evt => {
 		evt.preventDefault();
-		const setCode = transCode(evt.code);
+		const setCode = evt.code;
 
 		if (evt.repeat && !g_mainRepeatObj.key.includes(setCode)) {
 			return blockCode(setCode);
@@ -8573,7 +9171,7 @@ const mainInit = _ => {
 		// 曲中リトライ、タイトルバック
 		if (setCode === g_kCdN[g_headerObj.keyRetry]) {
 
-			if (g_isMac && keyIsDown(g_kCdNameObj.shiftKey)) {
+			if (g_isMac && (keyIsDown(g_kCdNameObj.shiftLKey) || keyIsDown(g_kCdNameObj.shiftRKey))) {
 				// Mac OS、IPad OSはDeleteキーが無いためShift+BSで代用
 				g_audio.pause();
 				clearTimeout(g_timeoutEvtId);
@@ -8590,7 +9188,7 @@ const mainInit = _ => {
 		} else if (setCode === g_kCdN[g_headerObj.keyTitleBack]) {
 			g_audio.pause();
 			clearTimeout(g_timeoutEvtId);
-			if (keyIsDown(g_kCdNameObj.shiftKey)) {
+			if (keyIsDown(g_kCdNameObj.shiftLKey) || keyIsDown(g_kCdNameObj.shiftRKey)) {
 				if (g_currentArrows !== g_fullArrows || g_stateObj.lifeMode === C_LFE_BORDER && g_workObj.lifeVal < g_workObj.lifeBorder) {
 					g_gameOverFlg = true;
 					g_finishFlg = false;
@@ -8629,7 +9227,7 @@ const mainInit = _ => {
 	};
 
 	document.onkeyup = evt => {
-		const setCode = transCode(evt.code);
+		const setCode = evt.code;
 		g_inputKeyBuffer[setCode] = false;
 		mainKeyUpActFunc[g_stateObj.autoAll]();
 	};
@@ -8708,12 +9306,12 @@ const mainInit = _ => {
 	 * @param _deleteObj 削除オブジェクト
 	 */
 	const judgeObjDelete = {};
-	g_typeLists.arrow.forEach(type => {
+	g_typeLists.arrow.forEach(type =>
 		judgeObjDelete[type] = (_j, _deleteName) => {
 			g_workObj[`judg${toCapitalize(type)}Cnt`][_j]++;
 			arrowSprite[g_attrObj[_deleteName].dividePos].removeChild(document.getElementById(_deleteName));
-		}
-	});
+			delete g_attrObj[_deleteName];
+		});
 
 	/**
 	 * 自動判定
@@ -8731,7 +9329,7 @@ const mainInit = _ => {
 
 		// 矢印(枠外判定、AutoPlay: OFF)
 		arrowOFF: (_j, _arrowName, _cnt) => {
-			if (_cnt < (-1) * g_judgObj.arrowJ[g_judgPosObj.uwan]) {
+			if (_cnt < (-1) * g_judgObj.arrowJ[g_judgPosObj.shobon]) {
 				g_workObj.diffListR.push(9);
 				createErrorbar(-10);
 				lblRatio.textContent = calculateRatio();
@@ -8805,9 +9403,9 @@ const mainInit = _ => {
 		// フリーズアロー(キーを離したときの処理)
 		frzKeyUp: (_j, _k, _frzName, _cnt) => {
 			if (g_attrObj[_frzName].keyUpFrame > g_headerObj.frzAttempt) {
-				judgeIknai(_cnt);
 				g_workObj.diffListR.push(10);
 				lblRatio.textContent = calculateRatio();
+				judgeIknai(_cnt);
 				g_attrObj[_frzName].judgEndFlg = true;
 				changeFailedFrz(_j, _k);
 			}
@@ -8864,7 +9462,7 @@ const mainInit = _ => {
 				const prevFrzName = `frz${_j}_${g_workObj.judgFrzCnt[_j]}`;
 				const prevFrz = g_attrObj[prevFrzName];
 
-				if (prevFrz.isMoving && prevFrz.cnt < (-1) * g_judgObj.frzJ[g_judgPosObj.kita]) {
+				if (prevFrz.isMoving && !prevFrz.judgEndFlg && prevFrz.cnt < (-1) * g_judgObj.frzJ[g_judgPosObj.kita]) {
 
 					// 自身より前のフリーズアローが未判定の場合、強制的に枠外判定を行いフリーズアローを削除
 					if (prevFrz.cnt >= (-1) * g_judgObj.frzJ[g_judgPosObj.iknai]) {
@@ -8987,7 +9585,7 @@ const mainInit = _ => {
 			const boostCnt = currentArrow.boostCnt;
 			currentArrow.prevY = currentArrow.y;
 			currentArrow.y -= (g_workObj.currentSpeed * currentArrow.boostSpd + g_workObj.motionOnFrames[boostCnt] * currentArrow.boostDir) * currentArrow.dir;
-			document.getElementById(arrowName).style.top = `${currentArrow.y}px`;
+			$id(arrowName).top = `${currentArrow.y}px`;
 			currentArrow.boostCnt--;
 		}
 		judgeMotionFunc[`${_name}${g_stateObj.autoAll}`](_j, arrowName, --currentArrow.cnt);
@@ -9091,7 +9689,7 @@ const mainInit = _ => {
 				// 移動
 				if (g_workObj.currentSpeed !== 0) {
 					currentFrz.y -= movY + g_workObj.motionOnFrames[currentFrz.boostCnt] * currentFrz.dir * currentFrz.boostDir;
-					document.getElementById(frzName).style.top = `${currentFrz.y}px`;
+					$id(frzName).top = `${currentFrz.y}px`;
 					currentFrz.boostCnt--;
 				}
 				currentFrz.cnt--;
@@ -9131,7 +9729,7 @@ const mainInit = _ => {
 			currentFrz.frzBarLength -= g_workObj.currentSpeed;
 			if (currentFrz.frzBarLength > 0) {
 				currentFrz.y -= movY;
-				document.getElementById(frzName).style.top = `${currentFrz.y}px`;
+				$id(frzName).top = `${currentFrz.y}px`;
 			} else {
 				judgeObjDelete[_name](_j, frzName);
 			}
@@ -9166,10 +9764,10 @@ const mainInit = _ => {
 			}
 		}
 
-		// 背景・マスクモーション
+		// 背景・マスクモーション、スキン変更
 		g_animationData.forEach(sprite => {
 			if (g_scoreObj[`${sprite}Data`][currentFrame] !== undefined) {
-				drawMainSpriteData(currentFrame, sprite);
+				g_animationFunc.drawMain[sprite](currentFrame, sprite);
 			}
 		});
 
@@ -9179,11 +9777,9 @@ const mainInit = _ => {
 			musicStartFlg = false;
 		}
 		if (musicStartFlg) {
-			const tmpVolume = (g_audio.volume + (3 * g_stateObj.volume / 100) / 1000);
-			g_audio.volume = (tmpVolume > 1 ? 1 : tmpVolume);
+			g_audio.volume = Math.min((g_audio.volume + (3 * g_stateObj.volume / 100) / 1000), 1);
 		} else if (isFadeOutArea) {
-			const tmpVolume = (g_audio.volume - (3 * g_stateObj.volume / 100 * C_FRM_AFTERFADE / g_scoreObj.fadeOutTerm) / 1000);
-			g_audio.volume = (tmpVolume < 0 ? 0 : tmpVolume);
+			g_audio.volume = Math.max((g_audio.volume - (3 * g_stateObj.volume / 100 * C_FRM_AFTERFADE / g_scoreObj.fadeOutTerm) / 1000), 0);
 		}
 
 		// ユーザカスタムイベント(フレーム毎)
@@ -9220,29 +9816,33 @@ const mainInit = _ => {
 
 		});
 
-		// ダミー矢印生成（背面に表示するため先に処理）
-		if (g_workObj.mkDummyArrow[currentFrame] !== undefined) {
-			g_workObj.mkDummyArrow[currentFrame].forEach(data =>
-				makeArrow(data, ++dummyArrowCnts[data], `dummyArrow`, g_workObj.dummyArrowColors[data]));
+		// キー変化
+		while (currentFrame >= g_scoreObj.keychFrames[keychCnts]) {
+			for (let j = 0; j < keyNum; j++) {
+				appearKeyTypes(j, g_scoreObj.keychTarget[keychCnts]);
+			}
+			keychCnts++;
 		}
+
+		// スクロール変化
+		changeScrollArrowDirs(currentFrame);
+		changeStepY(currentFrame);
+
+		// ダミー矢印生成（背面に表示するため先に処理）
+		g_workObj.mkDummyArrow[currentFrame]?.forEach(data =>
+			makeArrow(data, ++dummyArrowCnts[data], `dummyArrow`, g_workObj.dummyArrowColors[data]));
 
 		// 矢印生成
-		if (g_workObj.mkArrow[currentFrame] !== undefined) {
-			g_workObj.mkArrow[currentFrame].forEach(data =>
-				makeArrow(data, ++arrowCnts[data], `arrow`, g_workObj.arrowColors[data]));
-		}
+		g_workObj.mkArrow[currentFrame]?.forEach(data =>
+			makeArrow(data, ++arrowCnts[data], `arrow`, g_workObj.arrowColors[data]));
 
 		// ダミーフリーズアロー生成
-		if (g_workObj.mkDummyFrzArrow[currentFrame] !== undefined) {
-			g_workObj.mkDummyFrzArrow[currentFrame].forEach(data =>
-				makeFrzArrow(data, ++dummyFrzCnts[data], `dummyFrz`, g_workObj.dummyFrzNormalColors[data], g_workObj.dummyFrzNormalBarColors[data]));
-		}
+		g_workObj.mkDummyFrzArrow[currentFrame]?.forEach(data =>
+			makeFrzArrow(data, ++dummyFrzCnts[data], `dummyFrz`, g_workObj.dummyFrzNormalColors[data], g_workObj.dummyFrzNormalBarColors[data]));
 
 		// フリーズアロー生成
-		if (g_workObj.mkFrzArrow[currentFrame] !== undefined) {
-			g_workObj.mkFrzArrow[currentFrame].forEach(data =>
-				makeFrzArrow(data, ++frzCnts[data], `frz`, g_workObj.frzNormalColors[data], g_workObj.frzNormalBarColors[data]));
-		}
+		g_workObj.mkFrzArrow[currentFrame]?.forEach(data =>
+			makeFrzArrow(data, ++frzCnts[data], `frz`, g_workObj.frzNormalColors[data], g_workObj.frzNormalBarColors[data]));
 
 		// 矢印・フリーズアロー移動＆消去
 		for (let j = 0; j < keyNum; j++) {
@@ -9279,56 +9879,54 @@ const mainInit = _ => {
 		}
 
 		// 歌詞表示
-		if (g_scoreObj.wordData[currentFrame] !== undefined) {
-			g_scoreObj.wordData[currentFrame].forEach(tmpObj => {
-				g_wordObj.wordDir = tmpObj[0];
-				g_wordObj.wordDat = tmpObj[1];
-				g_wordSprite = document.querySelector(`#lblword${g_wordObj.wordDir}`);
+		g_scoreObj.wordData[currentFrame]?.forEach(tmpObj => {
+			g_wordObj.wordDir = tmpObj[0];
+			g_wordObj.wordDat = tmpObj[1];
+			g_wordSprite = document.querySelector(`#lblword${g_wordObj.wordDir}`);
 
-				const wordDepth = Number(g_wordObj.wordDir);
-				if (g_wordObj.wordDat.substring(0, 5) === `[fade`) {
+			const wordDepth = Number(g_wordObj.wordDir);
+			if (g_wordObj.wordDat.substring(0, 5) === `[fade`) {
 
-					// フェードイン・アウト開始
-					const fkey = fadeFlgs[Object.keys(fadeFlgs).find(flg => g_wordObj.wordDat === `[${flg}]`)];
-					g_wordObj[`fade${fkey[0]}Flg${wordDepth}`] = true;
-					g_wordObj[`fade${fkey[1]}Flg${wordDepth}`] = false;
-					g_wordSprite.style.animationName =
-						`fade${fkey[0]}${(++g_workObj[`fade${fkey[0]}No`][wordDepth] % 2)}`;
+				// フェードイン・アウト開始
+				const fkey = fadeFlgs[Object.keys(fadeFlgs).find(flg => g_wordObj.wordDat === `[${flg}]`)];
+				g_wordObj[`fade${fkey[0]}Flg${wordDepth}`] = true;
+				g_wordObj[`fade${fkey[1]}Flg${wordDepth}`] = false;
+				g_wordSprite.style.animationName =
+					`fade${fkey[0]}${(++g_workObj[`fade${fkey[0]}No`][wordDepth] % 2)}`;
 
-					g_workObj.lastFadeFrame[wordDepth] = currentFrame;
-					g_workObj.wordFadeFrame[wordDepth] = (tmpObj.length > 2 ?
-						setIntVal(tmpObj[2], C_WOD_FRAME) : C_WOD_FRAME);
+				g_workObj.lastFadeFrame[wordDepth] = currentFrame;
+				g_workObj.wordFadeFrame[wordDepth] = (tmpObj.length > 2 ?
+					setIntVal(tmpObj[2], C_WOD_FRAME) : C_WOD_FRAME);
 
-					g_wordSprite.style.animationDuration = `${g_workObj.wordFadeFrame[wordDepth] / g_fps}s`;
-					g_wordSprite.style.animationTimingFunction = `linear`;
-					g_wordSprite.style.animationFillMode = `forwards`;
+				g_wordSprite.style.animationDuration = `${g_workObj.wordFadeFrame[wordDepth] / g_fps}s`;
+				g_wordSprite.style.animationTimingFunction = `linear`;
+				g_wordSprite.style.animationFillMode = `forwards`;
 
-				} else if ([`[center]`, `[left]`, `[right]`].includes(g_wordObj.wordDat)) {
+			} else if ([`[center]`, `[left]`, `[right]`].includes(g_wordObj.wordDat)) {
 
-					// 歌詞位置変更
-					g_wordSprite.style.textAlign = g_wordObj.wordDat.slice(1, -1);
+				// 歌詞位置変更
+				g_wordSprite.style.textAlign = g_wordObj.wordDat.slice(1, -1);
 
-				} else if (/\[fontSize=\d+\]/.test(g_wordObj.wordDat)) {
+			} else if (/\[fontSize=\d+\]/.test(g_wordObj.wordDat)) {
 
-					// フォントサイズ変更
-					const fontSize = setIntVal(g_wordObj.wordDat.match(/\d+/)[0], C_SIZ_MAIN);
-					g_wordSprite.style.fontSize = `${fontSize}px`;
+				// フォントサイズ変更
+				const fontSize = setIntVal(g_wordObj.wordDat.match(/\d+/)[0], g_limitObj.mainSiz);
+				g_wordSprite.style.fontSize = `${fontSize}px`;
 
-				} else {
+			} else {
 
-					// フェードイン・アウト処理後、表示する歌詞を表示
-					const fadingFlg = currentFrame - g_workObj.lastFadeFrame[wordDepth] >= g_workObj.wordFadeFrame[wordDepth];
-					[`Out`, `In`].forEach(pattern => {
-						if (g_wordObj[`fade${pattern}Flg${g_wordObj.wordDir}`] && fadingFlg) {
-							g_wordSprite.style.animationName = `none`;
-							g_wordObj[`fade${pattern}Flg${g_wordObj.wordDir}`] = false;
-						}
-					});
-					g_workObj[`word${g_wordObj.wordDir}Data`] = g_wordObj.wordDat;
-					g_wordSprite.innerHTML = g_wordObj.wordDat;
-				}
-			});
-		}
+				// フェードイン・アウト処理後、表示する歌詞を表示
+				const fadingFlg = currentFrame - g_workObj.lastFadeFrame[wordDepth] >= g_workObj.wordFadeFrame[wordDepth];
+				[`Out`, `In`].forEach(pattern => {
+					if (g_wordObj[`fade${pattern}Flg${g_wordObj.wordDir}`] && fadingFlg) {
+						g_wordSprite.style.animationName = `none`;
+						g_wordObj[`fade${pattern}Flg${g_wordObj.wordDir}`] = false;
+					}
+				});
+				g_workObj[`word${g_wordObj.wordDir}Data`] = g_wordObj.wordDat;
+				g_wordSprite.innerHTML = g_wordObj.wordDat;
+			}
+		});
 
 		// 判定キャラクタ消去
 		jdgGroups.forEach(jdg => {
@@ -9379,7 +9977,7 @@ const mainInit = _ => {
 			}
 			g_scoreObj.frameNum++;
 			g_scoreObj.baseFrame++;
-			g_timeoutEvtId = setTimeout(_ => flowTimeline(), 1000 / g_fps - buffTime);
+			g_timeoutEvtId = setTimeout(flowTimeline, 1000 / g_fps - buffTime);
 		}
 	};
 	g_skinJsObj.main.forEach(func => func());
@@ -9394,7 +9992,7 @@ const mainInit = _ => {
 		g_audio.play(musicStartAdjustment);
 	}
 
-	g_timeoutEvtId = setTimeout(_ => flowTimeline(), 1000 / g_fps);
+	g_timeoutEvtId = setTimeout(flowTimeline, 1000 / g_fps);
 };
 
 /**
@@ -9441,10 +10039,29 @@ const changeAppearanceFilter = (_appearance, _num = 10) => {
  */
 const makeCounterSymbol = (_id, _x, _class, _heightPos, _text, _display = C_DIS_INHERIT) => {
 	return createDivCss2Label(_id, _text, {
-		x: _x, y: C_LEN_JDGCNTS_HEIGHT * _heightPos,
-		w: C_LEN_JDGCNTS_WIDTH, h: C_LEN_JDGCNTS_HEIGHT, siz: C_SIZ_JDGCNTS, align: C_ALIGN_RIGHT,
+		x: _x, y: g_limitObj.jdgCntsHeight * _heightPos,
+		w: g_limitObj.jdgCntsWidth, h: g_limitObj.jdgCntsHeight, siz: g_limitObj.jdgCntsSiz, align: C_ALIGN_RIGHT,
 		display: _display,
 	}, _class);
+};
+
+/**
+ * ステップゾーンの表示・非表示切替
+ * @param {number} _j
+ * @param {string} _display 
+ */
+const appearStepZone = (_j, _display) => $id(`stepRoot${_j}`).display = _display;
+
+/**
+ * 部分キーのステップゾーン出現処理
+ * @param {number} _j 
+ * @param {string} _target 
+ */
+const appearKeyTypes = (_j, _target) => {
+	appearStepZone(_j, C_DIS_NONE);
+	if (g_workObj.keyGroupMaps[_j].includes(_target)) {
+		appearStepZone(_j, C_DIS_INHERIT);
+	}
 };
 
 // TODO: この部分を矢印塗りつぶし部分についても適用できるように関数を見直し
@@ -9481,25 +10098,42 @@ const changeColors = (_mkColor, _mkColorCd, _header, _name) => {
  * @param {number} _frameNum
  */
 const changeCssMotions = (_header, _name, _frameNum) => {
-
 	const camelHeader = _header === `` ? _name : `${_header}${toCapitalize(_name)}`;
-	const frameData = g_workObj[`mk${toCapitalize(camelHeader)}CssMotion`][_frameNum];
-
-	if (frameData !== undefined) {
-		for (let j = 0; j < frameData.length; j++) {
-			const targetj = frameData[j];
-			g_workObj[`${camelHeader}CssMotions`][targetj] =
-				g_workObj[`mk${toCapitalize(camelHeader)}CssMotionName`][_frameNum][2 * j + g_workObj.dividePos[targetj]];
-		}
-	}
+	g_workObj[`mk${toCapitalize(camelHeader)}CssMotion`][_frameNum]?.forEach((targetj, j) =>
+		g_workObj[`${camelHeader}CssMotions`][targetj] =
+		g_workObj[`mk${toCapitalize(camelHeader)}CssMotionName`][_frameNum][2 * j + g_workObj.dividePos[targetj]]);
 };
+
+/**
+ * スクロール方向の変更（矢印・フリーズアロー）
+ * @param {number} _frameNum 
+ */
+const changeScrollArrowDirs = (_frameNum) =>
+	g_workObj.mkScrollchArrow[_frameNum]?.forEach((targetj, j) => {
+		g_workObj.scrollDir[targetj] = g_workObj.scrollDirDefault[targetj] * g_workObj.mkScrollchArrowDir[_frameNum][j];
+		g_workObj.dividePos[targetj] = (g_workObj.scrollDir[targetj] === 1 ? 0 : 1);
+	});
+
+/**
+ * ステップゾーンの位置反転
+ * @param {number} _frameNum 
+ */
+const changeStepY = (_frameNum) =>
+	g_workObj.mkScrollchStep[_frameNum]?.forEach((targetj, j) => {
+		const dividePos = (g_workObj.scrollDirDefault[targetj] * g_workObj.mkScrollchStepDir[_frameNum][j] === 1 ? 0 : 1);
+		const baseY = C_STEP_Y + g_posObj.reverseStepY * dividePos;
+		$id(`stepRoot${targetj}`).top = `${baseY}px`;
+		$id(`frzHit${targetj}`).top = `${baseY}px`;
+	});
 
 /**
  * フリーズアローヒット時の描画変更
  * @param {number} _j 
  * @param {number} _k 
+ * @param {string} _name
+ * @param {number} _difFrame
  */
-const changeHitFrz = (_j, _k, _name) => {
+const changeHitFrz = (_j, _k, _name, _difFrame = 0) => {
 	const frzNo = `${_j}_${_k}`;
 	const frzName = `${_name}${frzNo}`;
 	const currentFrz = g_attrObj[frzName];
@@ -9510,19 +10144,23 @@ const changeHitFrz = (_j, _k, _name) => {
 
 	const styfrzBar = $id(`${_name}Bar${frzNo}`);
 	const styfrzBtm = $id(`${_name}Btm${frzNo}`);
+	const styfrzTopShadow = $id(`${_name}TopShadow${frzNo}`);
 	const styfrzBtmShadow = $id(`${_name}BtmShadow${frzNo}`);
 	const colorPos = g_keyObj[`color${g_keyObj.currentKey}_${g_keyObj.currentPtn}`][_j];
 
 	// フリーズアロー位置の修正（ステップゾーン上に来るように）
 	const delFrzLength = parseFloat($id(`stepRoot${_j}`).top) - currentFrz.y;
-	document.getElementById(frzName).style.top = $id(`stepRoot${_j}`).top;
+	$id(frzName).top = $id(`stepRoot${_j}`).top;
 
 	// 早押ししたboostCnt分のフリーズアロー終端位置の修正
 	const delFrzMotionLength = sumData(g_workObj.motionOnFrames.slice(0, currentFrz.boostCnt + 1));
 
+	// 判定位置調整分の補正
+	const hitPos = g_workObj.hitPosition * g_workObj.scrollDir[_j];
+
 	currentFrz.frzBarLength -= (delFrzLength + delFrzMotionLength) * currentFrz.dir;
-	currentFrz.barY -= (delFrzLength + delFrzMotionLength) * currentFrz.dividePos;
-	currentFrz.btmY -= delFrzLength + delFrzMotionLength;
+	currentFrz.barY -= (delFrzLength + delFrzMotionLength) * currentFrz.dividePos + hitPos;
+	currentFrz.btmY -= delFrzLength + delFrzMotionLength + hitPos;
 	currentFrz.y += delFrzLength;
 	currentFrz.isMoving = false;
 
@@ -9531,6 +10169,7 @@ const changeHitFrz = (_j, _k, _name) => {
 	styfrzBar.background = g_workObj[`${_name}HitBarColors`][_j];
 	styfrzBtm.top = `${currentFrz.btmY}px`;
 	styfrzBtm.background = g_workObj[`${_name}HitColors`][_j];
+	styfrzTopShadow.opacity = 0;
 	styfrzBtmShadow.top = styfrzBtm.top;
 	if (_name === `frz`) {
 		if (g_headerObj.frzShadowColor[colorPos][1] !== ``) {
@@ -9543,6 +10182,8 @@ const changeHitFrz = (_j, _k, _name) => {
 			$id(`frzHitTop${_j}`).background = g_workObj.frzHitColors[_j];
 		}
 	}
+
+	g_customJsObj[`judg_${_name}Hit`].forEach(func => func(_difFrame));
 };
 
 /**
@@ -9555,9 +10196,15 @@ const changeFailedFrz = (_j, _k) => {
 	$id(`frzHit${_j}`).opacity = 0;
 	$id(`frzTop${frzNo}`).display = C_DIS_INHERIT;
 	$id(`frzTop${frzNo}`).background = `#cccccc`;
+	$id(`frzTopShadow${frzNo}`).opacity = 1;
 	$id(`frzBar${frzNo}`).background = `#999999`;
 	$id(`frzBar${frzNo}`).opacity = 1;
 	$id(`frzBtm${frzNo}`).background = `#cccccc`;
+
+	// 判定位置調整分の補正
+	const hitPos = g_workObj.hitPosition * g_workObj.scrollDir[_j];
+	$id(`frzTop${frzNo}`).top = `${- hitPos}px`;
+	$id(`frzTopShadow${frzNo}`).top = `${- hitPos}px`;
 
 	const colorPos = g_keyObj[`color${g_keyObj.currentKey}_${g_keyObj.currentPtn}`][_j];
 	if (g_headerObj.frzShadowColor[colorPos][0] !== ``) {
@@ -9590,21 +10237,30 @@ const judgeArrow = _j => {
 
 	const judgeTargetArrow = _difFrame => {
 		const _difCnt = Math.abs(_difFrame);
-		if (_difCnt <= g_judgObj.arrowJ[g_judgPosObj.uwan]) {
+		const stepHitTargetArrow = _resultJdg => {
+			const stepDivHit = document.querySelector(`#stepHit${_j}`);
+			stepDivHit.style.top = `${currentArrow.prevY - parseFloat($id(`stepRoot${_j}`).top) - 15 + g_workObj.hitPosition * g_workObj.scrollDir[_j]}px`;
+			stepDivHit.style.opacity = 0.75;
+			stepDivHit.classList.value = ``;
+			stepDivHit.classList.add(g_cssObj[`main_step${_resultJdg}`]);
+			stepDivHit.setAttribute(`cnt`, C_FRM_HITMOTION);
+		}
+
+		if (g_stateObj.excessive === C_FLG_ON && _difFrame <= g_judgObj.arrowJ[g_judgPosObj.uwan] && _difFrame > g_judgObj.arrowJ[g_judgPosObj.shobon]) {
+			// 空押し判定（有効かつ早押し時のみ）
+			displayDiff(_difFrame);
+			stepHitTargetArrow(`Excessive`);
+			return true;
+
+		} else if (_difCnt <= g_judgObj.arrowJ[g_judgPosObj.shobon]) {
+			// 通常判定
 			g_workObj.diffListR.push(_difCnt);
 			createErrorbar(_difFrame);
 			lblRatio.textContent = calculateRatio();
 			const [resultFunc, resultJdg] = checkJudgment(_difCnt);
 			resultFunc(_difFrame);
 			displayDiff(_difFrame);
-
-			const stepDivHit = document.querySelector(`#stepHit${_j}`);
-			stepDivHit.style.top = `${currentArrow.prevY - parseFloat($id(`stepRoot${_j}`).top) - 15}px`;
-			stepDivHit.style.opacity = 0.75;
-			stepDivHit.classList.value = ``;
-			stepDivHit.classList.add(g_cssObj[`main_step${resultJdg}`]);
-			stepDivHit.setAttribute(`cnt`, C_FRM_HITMOTION);
-
+			stepHitTargetArrow(resultJdg);
 			document.getElementById(arrowName).remove();
 			g_workObj.judgArrowCnt[_j]++;
 			return true;
@@ -9629,14 +10285,17 @@ const judgeArrow = _j => {
 				createErrorbar(_difFrame, true);
 				lblRatio.textContent = calculateRatio();
 			}
-			
+
 			if (_difCnt <= g_judgObj.frzJ[g_judgPosObj.sfsf]) {
-				changeHitFrz(_j, fcurrentNo, `frz`);
+				changeHitFrz(_j, fcurrentNo, `frz`, _difFrame);
 			} else {
 				changeFailedFrz(_j, fcurrentNo);
+				if (g_headerObj.frzStartjdgUse) {
+					judgeIknai(_difFrame);
+					currentFrz.judgEndFlg = true;
+				}
 			}
 			g_workObj.judgFrzHitCnt[_j] = fcurrentNo + 1;
-
 			return true;
 		}
 		return false;
@@ -9667,11 +10326,15 @@ const displayDiff = (_difFrame, _fjdg = ``, _justFrames = g_headerObj.justFrames
 	lblEstAdj.style.zIndex = 100;
 	g_workObj.diffList.push(_difFrame);
 	const difCnt = Math.abs(_difFrame);
-	if (_difFrame > _justFrames) {
-		diffJDisp = `<span class="common_matari">Fast ${difCnt} Frames</span>`;
+	if (_difFrame > g_judgObj.arrowJ[g_judgPosObj.shobon]) {
+		diffJDisp = `<span class="common_excessive">Excessive</span>`;
+		g_resultObj.excessive++;
+		lifeDamage(true);
+	} else if (_difFrame > _justFrames) {
+		diffJDisp = `<span class="common_diffFast">Fast ${difCnt} Frames</span>`;
 		g_resultObj.fast++;
 	} else if (_difFrame < _justFrames * (-1)) {
-		diffJDisp = `<span class="common_shobon">Slow ${difCnt} Frames</span>`;
+		diffJDisp = `<span class="common_diffSlow">Slow ${difCnt} Frames</span>`;
 		g_resultObj.slow++;
 	}
 	document.getElementById(`diff${_fjdg}J`).innerHTML = diffJDisp;
@@ -9709,8 +10372,12 @@ const lifeRecovery = _ => {
 	}
 };
 
-const lifeDamage = _ => {
-	g_workObj.lifeVal -= g_workObj.lifeDmg;
+/**
+ * ゲージダメージ処理
+ * @param {boolean} _excessive 
+ */
+const lifeDamage = (_excessive = false) => {
+	g_workObj.lifeVal -= g_workObj.lifeDmg * (_excessive ? 0.25 : 1);
 
 	if (g_workObj.lifeVal <= 0) {
 		g_workObj.lifeVal = 0;
@@ -9931,7 +10598,6 @@ const finishViewing = _ => {
 	}
 };
 
-
 function calculateWRatio () {
 	/*function AppErfA (_argument) {
 		return 2 / (1 + Math.exp(-3.454 * _argument)) - 1;
@@ -9979,7 +10645,10 @@ function calculateWRatio () {
 	WC_sum += WifeCalc(g_workObj.diffListR[j]);
 	}
 	if (g_workObj.diffListR.length !== 0) {
-		const result = (WC_sum / g_workObj.diffListR.length).toFixed(2);
+		let result = (WC_sum / g_workObj.diffListR.length).toFixed(2);
+		if (result == 100.00) {
+			result = 100;
+		}
 		return `${result}%`;
 	} else {
 		return `0.00%`;
@@ -10002,7 +10671,10 @@ function calculateKRatio () {
 		KC_sum += KaCalc(g_workObj.diffListR[j]);
 	}
 	if (g_workObj.diffListR.length !== 0) {	
-		const result = (KC_sum / g_workObj.diffListR.length).toFixed(2);
+		let result = (KC_sum / g_workObj.diffListR.length).toFixed(2);
+		if (result == 100.00) {
+			result = 100;
+		}
 		return `${result}%`;
 	} else {
 		return `0.00%`;
@@ -10026,7 +10698,10 @@ function calculateGauge () {
 	}
 	
 	if ((g_workObj.lifeRcv + g_workObj.lifeDmg) * g_workObj.diffListR.length !== 0) {
-		const result = (100 * (Gauge_sum + g_workObj.lifeDmg * g_workObj.diffListR.length) / ((g_workObj.lifeRcv + g_workObj.lifeDmg) * g_workObj.diffListR.length)).toFixed(2);
+		let result = (100 * (Gauge_sum + g_workObj.lifeDmg * g_workObj.diffListR.length) / ((g_workObj.lifeRcv + g_workObj.lifeDmg) * g_workObj.diffListR.length)).toFixed(2);
+		if (result == 100.00) {
+			result = 100;
+		}
 		return `${result}%`;
 	} else {
 		return `0.00%`;
@@ -10071,12 +10746,12 @@ const resultInit = _ => {
 
 	// 結果画面用フレーム初期化
 	g_scoreObj.resultFrameNum = 0;
-	g_scoreObj.backResultFrameNum = 0;
-	g_scoreObj.maskResultFrameNum = 0;
 
-	// 結果画面用ループカウンター
-	g_scoreObj.backResultLoopCount = 0;
-	g_scoreObj.maskResultLoopCount = 0;
+	// リザルトアニメーション用フレーム初期化、ループカウンター設定
+	g_animationData.forEach(sprite => {
+		g_scoreObj[`${sprite}ResultFrameNum`] = 0;
+		g_scoreObj[`${sprite}ResultLoopCount`] = 0;
+	});
 
 	const divRoot = document.querySelector(`#divRoot`);
 
@@ -10094,14 +10769,14 @@ const resultInit = _ => {
 			g_animationData.forEach(sprite => {
 				const failedData = g_rootObj[`${sprite}failedS${scoreIdHeader}_data`] ?? g_rootObj[`${sprite}failedS_data`];
 				if (failedData !== undefined) {
-					[g_headerObj[`${sprite}ResultData`], g_headerObj[`${sprite}ResultMaxDepth`]] = makeSpriteData(failedData);
+					[g_headerObj[`${sprite}ResultData`], g_headerObj[`${sprite}ResultMaxDepth`]] = g_animationFunc.make[sprite](failedData);
 				}
 			});
 		} else if (g_gameOverFlg) {
-			g_headerObj.backResultData = g_headerObj.backFailedData.concat();
-			g_headerObj.maskResultData = g_headerObj.maskFailedData.concat();
-			g_headerObj.backResultMaxDepth = g_headerObj.backFailedMaxDepth;
-			g_headerObj.maskResultMaxDepth = g_headerObj.maskFailedMaxDepth;
+			g_animationData.forEach(sprite => {
+				g_headerObj[`${sprite}ResultData`] = g_headerObj[`${sprite}FailedData`].concat();
+				g_headerObj[`${sprite}ResultMaxDepth`] = g_headerObj[`${sprite}FailedMaxDepth`];
+			});
 		}
 	}
 
@@ -10118,11 +10793,12 @@ const resultInit = _ => {
 	};
 	const bayesExVal = 6 * bayesFunc(0, diffLength) / (diffLength * (diffLength + 1) * (diffLength + 2));
 	const estimatedAdj = (diffLength <= 20 ? `` : Math.round((g_stateObj.adjustment - bayesExVal) * 10) / 10);
-	
+
 	const WifePercent = calculateWRatio();
 	const KaraPercent = calculateKRatio();
 	const GaugePercent = calculateGauge();
-
+	
+	
 	// 背景スプライトを作成
 	createMultipleSprite(`backResultSprite`, g_headerObj.backResultMaxDepth);
 
@@ -10151,7 +10827,7 @@ const resultInit = _ => {
 		rankMark = g_rankObj.rankMarkF;
 		rankColor = g_rankObj.rankColorF;
 		g_resultObj.spState = `failed`;
-	} else if (playingArrows === g_fullArrows && g_stateObj.autoAll === C_FLG_OFF) {
+	} else if (playingArrows === g_fullArrows && g_stateObj.autoAll === C_FLG_OFF && !(g_headerObj.excessiveJdgUse && g_stateObj.excessive === C_FLG_OFF)) {
 		if (g_resultObj.spState === ``) {
 			g_resultObj.spState = `cleared`;
 		}
@@ -10170,9 +10846,8 @@ const resultInit = _ => {
 
 	const mTitleForView = [g_headerObj.musicTitleForView[0], g_headerObj.musicTitleForView[1] || ``];
 	if (g_headerObj.musicTitlesForView[g_headerObj.musicNos[g_stateObj.scoreId]] !== undefined) {
-		mTitleForView.forEach((mTitle, j) => {
-			mTitleForView[j] = g_headerObj.musicTitlesForView[g_headerObj.musicNos[g_stateObj.scoreId]][j];
-		});
+		mTitleForView.forEach((mTitle, j) =>
+			mTitleForView[j] = g_headerObj.musicTitlesForView[g_headerObj.musicNos[g_stateObj.scoreId]][j]);
 	}
 
 	const keyCtrlPtn = `${g_keyObj.currentKey}_${g_keyObj.currentPtn}`;
@@ -10187,12 +10862,14 @@ const resultInit = _ => {
 	const withOptions = (_flg, _defaultSet, _displayText = _flg) =>
 		(_flg !== _defaultSet ? getStgDetailName(_displayText) : ``);
 
-	let difData = [
+	const difDatas = [
 		`${getKeyName(g_headerObj.keyLabels[g_stateObj.scoreId])}${transKeyData} ${getStgDetailName('key')} / ${g_headerObj.difLabels[g_stateObj.scoreId]}`,
 		`${withOptions(g_autoPlaysBase.includes(g_stateObj.autoPlay), true, `-${getStgDetailName(g_stateObj.autoPlay)}${getStgDetailName('less')}`)}`,
 		`${withOptions(g_headerObj.makerView, false, `(${g_headerObj.creatorNames[g_stateObj.scoreId]})`)}`,
 		`${withOptions(g_stateObj.shuffle, C_FLG_OFF, `[${getStgDetailName(g_stateObj.shuffle)}]`)}`
-	].filter(value => value !== ``).join(` `);
+	];
+	let difData = difDatas.filter(value => value !== ``).join(` `);
+	const difDataForImage = difDatas.filter((value, j) => value !== `` && j !== 2).join(` `);
 
 	let playStyleData = [
 		`${g_stateObj.speed}${g_lblNameObj.multi}`,
@@ -10245,46 +10922,51 @@ const resultInit = _ => {
 
 	// キャラクタ、スコア描画のID共通部、色CSS名、スコア変数名
 	const jdgScoreObj = {
-		ii: { pos: 0, id: `Ii`, color: `ii`, label: g_lblNameObj.j_ii, },
-		shakin: { pos: 1, id: `Shakin`, color: `shakin`, label: g_lblNameObj.j_shakin, },
-		matari: { pos: 2, id: `Matari`, color: `matari`, label: g_lblNameObj.j_matari, },
-		shobon: { pos: 3, id: `Shobon`, color: `shobon`, label: g_lblNameObj.j_shobon, },
-		uwan: { pos: 4, id: `Uwan`, color: `uwan`, label: g_lblNameObj.j_uwan, },
-		kita: { pos: 5, id: `Kita`, color: `kita`, label: g_lblNameObj.j_kita, },
-		iknai: { pos: 6, id: `Iknai`, color: `iknai`, label: g_lblNameObj.j_iknai, },
-		maxCombo: { pos: 7, id: `MCombo`, color: `combo`, label: g_lblNameObj.j_maxCombo, },
-		fmaxCombo: { pos: 8, id: `FCombo`, color: `combo`, label: g_lblNameObj.j_fmaxCombo, },
-		score: { pos: 10, id: `Score`, color: `score`, label: g_lblNameObj.j_score, },
+		ii: { pos: 0, id: `Ii`, color: `ii`, label: g_lblNameObj.j_ii, dfColor: `#66ffff`, },
+		shakin: { pos: 1, id: `Shakin`, color: `shakin`, label: g_lblNameObj.j_shakin, dfColor: `#99ff99`, },
+		matari: { pos: 2, id: `Matari`, color: `matari`, label: g_lblNameObj.j_matari, dfColor: `#ff9966`, },
+		shobon: { pos: 3, id: `Shobon`, color: `shobon`, label: g_lblNameObj.j_shobon, dfColor: `#ccccff`, },
+		uwan: { pos: 4, id: `Uwan`, color: `uwan`, label: g_lblNameObj.j_uwan, dfColor: `#ff9999`, },
+		kita: { pos: 5, id: `Kita`, color: `kita`, label: g_lblNameObj.j_kita, dfColor: `#ffff99`, },
+		iknai: { pos: 6, id: `Iknai`, color: `iknai`, label: g_lblNameObj.j_iknai, dfColor: `#99ff66`, },
+		maxCombo: { pos: 7, id: `MCombo`, color: `combo`, label: g_lblNameObj.j_maxCombo, dfColor: `#ffffff`, },
+		fmaxCombo: { pos: 8, id: `FCombo`, color: `combo`, label: g_lblNameObj.j_fmaxCombo, dfColor: `#ffffff`, },
+		score: { pos: 10, id: `Score`, color: `score`, label: g_lblNameObj.j_score, dfColor: `#ffffff`, },
 	};
 
 	// キャラクタ、スコア描画
-	Object.keys(jdgScoreObj).forEach(score => {
+	Object.keys(jdgScoreObj).forEach(score =>
 		multiAppend(resultWindow,
 			makeCssResultSymbol(`lbl${jdgScoreObj[score].id}`, 0, g_cssObj[`common_${jdgScoreObj[score].color}`], jdgScoreObj[score].pos, jdgScoreObj[score].label),
 			makeCssResultSymbol(`lbl${jdgScoreObj[score].id}S`, 50, g_cssObj.common_score, jdgScoreObj[score].pos, g_resultObj[score], C_ALIGN_RIGHT),
-		);
-	});
+		));
 	if (g_stateObj.autoAll === C_FLG_OFF) {
 		multiAppend(resultWindow,
-			makeCssResultSymbol(`lblFast`, 350, g_cssObj.common_matari, 0, g_lblNameObj.j_fast),
-			makeCssResultSymbol(`lblSlow`, 350, g_cssObj.common_shobon, 2, g_lblNameObj.j_slow),
+			makeCssResultSymbol(`lblFast`, 350, g_cssObj.common_diffFast, 0, g_lblNameObj.j_fast),
+			makeCssResultSymbol(`lblSlow`, 350, g_cssObj.common_diffSlow, 2, g_lblNameObj.j_slow),
 			makeCssResultSymbol(`lblFastS`, 260, g_cssObj.score, 1, g_resultObj.fast, C_ALIGN_RIGHT),
 			makeCssResultSymbol(`lblSlowS`, 260, g_cssObj.score, 3, g_resultObj.slow, C_ALIGN_RIGHT),
 		);
 		if (estimatedAdj !== ``) {
 			multiAppend(resultWindow,
-				makeCssResultSymbol(`lblAdj`, 420, g_cssObj.common_kita, 4, g_lblNameObj.j_adj),
-				makeCssResultSymbol(`lblAdjS`, 330, g_cssObj.score, 5, `${getDiffFrame(estimatedAdj)}`, C_ALIGN_RIGHT),
+				makeCssResultSymbol(`lblAdj`, 350, g_cssObj.common_estAdj, 4, g_lblNameObj.j_adj),
+				makeCssResultSymbol(`lblAdjS`, 260, g_cssObj.score, 5, `${getDiffFrame(estimatedAdj)}`, C_ALIGN_RIGHT),
 			);
 		}
 		multiAppend(resultWindow,
-			makeCssResultSymbol(`lblWCalc`, 350, g_cssObj.common_ii, 4, `W-Ratio`),
-			makeCssResultSymbol(`lblWCalcS`, 260, g_cssObj.score, 5, WifePercent, C_ALIGN_RIGHT),		
-			makeCssResultSymbol(`lblKCalc`, 350, g_cssObj.common_uwan, 6, `K-Ratio`),
-			makeCssResultSymbol(`lblKCalcS`, 260, g_cssObj.score, 7, KaraPercent, C_ALIGN_RIGHT),	
-			makeCssResultSymbol(`lblGCalc`, 420, g_cssObj.common_shakin, 6, `Gauge`),
-			makeCssResultSymbol(`lblGCalcS`, 330, g_cssObj.score, 7, GaugePercent, C_ALIGN_RIGHT),
+			makeCssResultSymbol(`lblWCalc`, 420, g_cssObj.common_ii, 0, `W-Ratio`),
+			makeCssResultSymbol(`lblWCalcS`, 330, g_cssObj.score, 1, WifePercent, C_ALIGN_RIGHT),		
+			makeCssResultSymbol(`lblKCalc`, 420, g_cssObj.common_uwan, 2, `K-Ratio`),
+			makeCssResultSymbol(`lblKCalcS`, 330, g_cssObj.score, 3, KaraPercent, C_ALIGN_RIGHT),	
+			makeCssResultSymbol(`lblGCalc`, 420, g_cssObj.common_shakin, 4, `Gauge`),
+			makeCssResultSymbol(`lblGCalcS`, 330, g_cssObj.score, 5, GaugePercent, C_ALIGN_RIGHT),
 		);
+		if (g_stateObj.excessive === C_FLG_ON) {
+			multiAppend(resultWindow,
+				makeCssResultSymbol(`lblExcessive`, 350, g_cssObj.common_excessive, 6, g_lblNameObj.j_excessive),
+				makeCssResultSymbol(`lblExcessiveS`, 260, g_cssObj.score, 7, g_resultObj.excessive, C_ALIGN_RIGHT),
+			);
+		}
 	}
 
 	// ランク描画
@@ -10320,7 +11002,9 @@ const resultInit = _ => {
 
 	// ハイスコア差分計算
 	const assistFlg = (g_autoPlaysBase.includes(g_stateObj.autoPlay) ? `` : `-${g_stateObj.autoPlay}less`);
-	let scoreName = `${g_headerObj.keyLabels[g_stateObj.scoreId]}${getStgDetailName('k-')}${g_headerObj.difLabels[g_stateObj.scoreId]}${assistFlg}`;
+	const mirrorName = (g_stateObj.shuffle.indexOf(`Mirror`) !== -1 ? `-${g_stateObj.shuffle}` : ``);
+	const transKeyName = (hasVal(g_keyObj[`transKey${keyCtrlPtn}`]) ? `(${g_keyObj[`transKey${keyCtrlPtn}`]})` : ``);
+	let scoreName = `${g_headerObj.keyLabels[g_stateObj.scoreId]}${transKeyName}${getStgDetailName('k-')}${g_headerObj.difLabels[g_stateObj.scoreId]}${assistFlg}${mirrorName}`;
 	if (g_headerObj.makerView) {
 		scoreName += `-${g_headerObj.creatorNames[g_stateObj.scoreId]}`;
 	}
@@ -10330,9 +11014,7 @@ const resultInit = _ => {
 		maxCombo: 0, fmaxCombo: 0, score: 0,
 	};
 
-	const highscoreCondition = (g_stateObj.autoAll === C_FLG_OFF && g_stateObj.shuffle === C_FLG_OFF &&
-		!hasVal(g_keyObj[`transKey${keyCtrlPtn}`]));
-
+	const highscoreCondition = (g_stateObj.autoAll === C_FLG_OFF && (g_stateObj.shuffle === C_FLG_OFF || mirrorName !== ``));
 	if (highscoreCondition) {
 
 		// ハイスコア差分描画
@@ -10410,6 +11092,9 @@ const resultInit = _ => {
 	}
 	const twiturl = new URL(g_localStorageUrl);
 	twiturl.searchParams.append(`scoreId`, g_stateObj.scoreId);
+	const baseTwitUrl = g_isLocal ? `` : `${twiturl.toString()}`.replace(/[\t\n]/g, ``);
+
+	const tweetExcessive = (g_stateObj.excessive === C_FLG_ON) ? `(+${g_resultObj.excessive})` : ``;
 
 	let tweetFrzJdg = ``;
 	let tweetMaxCombo = `${g_resultObj.maxCombo}`;
@@ -10426,18 +11111,128 @@ const resultInit = _ => {
 		[`[rank]`, rankMark],
 		[`[score]`, g_resultObj.score],
 		[`[playStyle]`, playStyleData],
-		[`[arrowJdg]`, `${g_resultObj.ii}-${g_resultObj.shakin}-${g_resultObj.matari}-${g_resultObj.shobon}-${g_resultObj.uwan}`],
+		[`[arrowJdg]`, `${g_resultObj.ii}-${g_resultObj.shakin}-${g_resultObj.matari}-${g_resultObj.shobon}-${g_resultObj.uwan}${tweetExcessive}`],
 		[`[frzJdg]`, tweetFrzJdg],
 		[`[maxCombo]`, tweetMaxCombo],
-		[`[url]`, g_isLocal ? `` : `${twiturl.toString()}`.replace(/[\t\n]/g, ``)]
+		[`[url]`, baseTwitUrl]
 	]);
 	if (g_presetObj.resultVals !== undefined) {
-		Object.keys(g_presetObj.resultVals).forEach(key => {
-			tweetResultTmp = tweetResultTmp.split(`[${key}]`).join(g_resultObj[g_presetObj.resultVals[key]]);
-		});
+		Object.keys(g_presetObj.resultVals).forEach(key =>
+			tweetResultTmp = tweetResultTmp.split(`[${key}]`).join(g_resultObj[g_presetObj.resultVals[key]]));
 	}
 	const resultText = `${unEscapeHtml(tweetResultTmp)}`;
 	const tweetResult = `https://twitter.com/intent/tweet?text=${encodeURIComponent(resultText)}`;
+	const currentDateTime = new Date().toLocaleString();
+
+	/**
+	 * リザルト画像をCanvasで作成しクリップボードへコピー
+	 * @param {string} _msg 
+	 */
+	const copyResultImageData = _msg => {
+		const tmpDiv = createEmptySprite(divRoot, `tmpDiv`, { x: 0, y: 0, w: g_sWidth, h: g_sHeight });
+		tmpDiv.style.background = `#000000cc`;
+		const canvas = document.createElement(`canvas`);
+		const artistName = g_headerObj.artistNames[g_headerObj.musicNos[g_stateObj.scoreId]] || g_headerObj.artistName;
+
+		canvas.id = `resultImage`;
+		canvas.width = 400;
+		canvas.height = 410;
+		canvas.style.left = `${(g_sWidth - canvas.width) / 2}px`;
+		canvas.style.top = `20px`;
+		canvas.style.position = `absolute`;
+
+		const context = canvas.getContext(`2d`);
+		const drawText = (_text, { x = 30, dy = 0, hy, siz = 15, color = `#cccccc`, align = C_ALIGN_LEFT, font } = {}) => {
+			context.font = `${siz}px ${getBasicFont(font)}`;
+			context.fillStyle = color;
+			context.textAlign = align;
+			context.fillText(_text, x, 35 + hy * 18 + dy);
+		};
+		const grd = context.createLinearGradient(0, 0, 0, canvas.height);
+		grd.addColorStop(0, `#000000`);
+		grd.addColorStop(1, `#222222`);
+		context.fillStyle = grd;
+		context.fillRect(0, 0, g_sWidth, g_sHeight);
+
+		drawText(`R`, { dy: -5, hy: 0, siz: 40, color: `#9999ff` });
+		drawText(`ESULT`, { x: 57, dy: -5, hy: 0, siz: 25 });
+		drawText(`${g_lblNameObj.dancing}${g_lblNameObj.star}${g_lblNameObj.onigiri}`,
+			{ x: 280, dy: -15, hy: 0, siz: 20, color: `#999999`, align: C_ALIGN_CENTER });
+		drawText(mTitleForView[0], { hy: 1 });
+		drawText(mTitleForView[1], { hy: 2 });
+		drawText(`📝 ${g_headerObj.tuning} / 🎵 ${artistName}`, { hy: mTitleForView[1] !== `` ? 3 : 2, siz: 12 });
+		drawText(difDataForImage, { hy: 4 });
+		drawText(playStyleData, { hy: 5 });
+
+		Object.keys(jdgScoreObj).forEach(score => {
+			drawText(g_lblNameObj[`j_${score}`], { hy: 7 + jdgScoreObj[score].pos, color: jdgScoreObj[score].dfColor });
+			drawText(g_resultObj[score], { x: 200, hy: 7 + jdgScoreObj[score].pos, align: C_ALIGN_RIGHT });
+		});
+
+		if (highscoreCondition) {
+			drawText(`(${highscoreDfObj.score >= 0 ? '+' : '-'} ${Math.abs(highscoreDfObj.score)})`,
+				{ x: 206, hy: 18, color: highscoreDfObj.score > 0 ? `#ffff99` : `#cccccc`, align: C_ALIGN_RIGHT });
+		}
+
+		if (g_stateObj.autoAll === C_FLG_OFF) {
+			drawText(g_lblNameObj.j_fast, { x: 240, hy: 7, color: `#ff9966` });
+			drawText(g_resultObj.fast, { x: 360, hy: 7, align: C_ALIGN_RIGHT });
+			drawText(g_lblNameObj.j_slow, { x: 240, hy: 8, color: `#ccccff` });
+			drawText(g_resultObj.slow, { x: 360, hy: 8, align: C_ALIGN_RIGHT });
+			if (estimatedAdj !== ``) {
+				drawText(g_lblNameObj.j_adj, { x: 240, hy: 9, color: `#99ff99` });
+				drawText(getDiffFrame(estimatedAdj), { x: 360, hy: 9, align: C_ALIGN_RIGHT });
+			}
+			if (g_stateObj.excessive === C_FLG_ON) {
+				drawText(g_lblNameObj.j_excessive, { x: 240, hy: 10, color: `#ffff99` });
+				drawText(g_resultObj.excessive, { x: 360, hy: 10, align: C_ALIGN_RIGHT });
+			}
+			drawText(g_lblNameObj.j_wratio, { x: 240, hy: 11, color: `#66ffff` });
+			drawText(WifePercent, { x: 360, hy: 11, align: C_ALIGN_RIGHT });
+			drawText(g_lblNameObj.j_kratio, { x: 240, hy: 12, color: `#ff9999` });
+			drawText(KaraPercent, { x: 360, hy: 12, align: C_ALIGN_RIGHT });
+			drawText(g_lblNameObj.j_gauge, { x: 240, hy: 13, color: `#99ff99` });
+			drawText(GaugePercent, { x: 360, hy: 13, align: C_ALIGN_RIGHT });
+		}
+		drawText(rankMark, { x: 240, hy: 18, siz: 50, color: rankColor, font: `"Bookman Old Style"` });
+		drawText(baseTwitUrl, { hy: 19, siz: 8 });
+		drawText(currentDateTime, { hy: 20 });
+
+		tmpDiv.appendChild(canvas);
+
+		try {
+			if (ClipboardItem === undefined) {
+				throw new Error(`error`);
+			}
+			// Canvas の内容を PNG 画像として取得
+			canvas.toBlob(async blob => {
+				await navigator.clipboard.write([
+					new ClipboardItem({
+						'image/png': blob
+					})
+				]);
+			});
+			tmpDiv.removeChild(canvas);
+			divRoot.removeChild(tmpDiv);
+			makeInfoWindow(_msg, `leftToRightFade`);
+
+		} catch (err) {
+			// 画像をクリップボードへコピーできないときは代替で画像保存可能な画面を表示
+			if (document.getElementById(`tmpClose`) === null) {
+				divRoot.oncontextmenu = _ => true;
+				makeLinkButton(tmpDiv, `Tmp`);
+				tmpDiv.appendChild(createCss2Button(`tmpClose`, g_lblNameObj.b_close, _ => true,
+					Object.assign(g_lblPosObj.btnRsCopyClose, {
+						resetFunc: _ => {
+							tmpDiv.removeChild(canvas);
+							divRoot.removeChild(tmpDiv);
+							divRoot.oncontextmenu = _ => false;
+						},
+					}), g_cssObj.button_Back));
+				tmpDiv.appendChild(createDescDiv(`resultImageDesc`, g_lblNameObj.resultImageDesc));
+			}
+		}
+	};
 
 	/** 音源、ループ処理の停止 */
 	const resetCommonBtn = (_id, _name, _posObj, _func, _cssClass) =>
@@ -10449,6 +11244,25 @@ const resultInit = _ => {
 			clearTimeout(g_timeoutEvtResultId);
 		}, Object.assign(_posObj, { resetFunc: _func }), _cssClass);
 
+	/**
+	 * 外部リンクボタンを作成
+	 * @param {object} _div 
+	 * @param {string} _param 
+	 */
+	const makeLinkButton = (_div = divRoot, _param = ``) => {
+		multiAppend(_div,
+			// リザルトデータをTwitterへ転送
+			createCss2Button(`btnTweet${_param}`, g_lblNameObj.b_tweet, _ => true, Object.assign(g_lblPosObj.btnRsTweet, {
+				resetFunc: _ => openLink(tweetResult),
+			}), g_cssObj.button_Tweet),
+
+			// Gitterへのリンク
+			createCss2Button(`btnGitter${_param}`, g_lblNameObj.b_gitter, _ => true, Object.assign(g_lblPosObj.btnRsGitter, {
+				resetFunc: _ => openLink(`https://app.gitter.im/#/room/#danonicw_freeboard:gitter.im`),
+			}), g_cssObj.button_Default),
+		);
+	}
+
 	// ボタン描画
 	multiAppend(divRoot,
 
@@ -10456,22 +11270,18 @@ const resultInit = _ => {
 		resetCommonBtn(`btnBack`, g_lblNameObj.b_back, g_lblPosObj.btnRsBack, titleInit, g_cssObj.button_Back),
 
 		// リザルトデータをクリップボードへコピー
-		createCss2Button(`btnCopy`, g_lblNameObj.b_copy, _ => {
-			copyTextToClipboard(resultText, g_msgInfoObj.I_0001);
-		}, g_lblPosObj.btnRsCopy, g_cssObj.button_Setting),
-
-		// リザルトデータをTwitterへ転送
-		createCss2Button(`btnTweet`, g_lblNameObj.b_tweet, _ => true, Object.assign(g_lblPosObj.btnRsTweet, {
-			resetFunc: _ => openLink(tweetResult),
-		}), g_cssObj.button_Tweet),
-
-		// Gitterへのリンク
-		createCss2Button(`btnGitter`, g_lblNameObj.b_gitter, _ => true, Object.assign(g_lblPosObj.btnRsGitter, {
-			resetFunc: _ => openLink(`https://gitter.im/danonicw/freeboard`),
-		}), g_cssObj.button_Default),
-
+		createCss2Button(`btnCopy`, g_lblNameObj.b_copy, _ => copyTextToClipboard(resultText, g_msgInfoObj.I_0001),
+			g_lblPosObj.btnRsCopy, g_cssObj.button_Setting),
+	);
+	makeLinkButton();
+	multiAppend(divRoot,
 		// リトライ
 		resetCommonBtn(`btnRetry`, g_lblNameObj.b_retry, g_lblPosObj.btnRsRetry, loadMusic, g_cssObj.button_Reset),
+
+		createCss2Button(`btnCopyImage`, `📷`, _ => true,
+			Object.assign(g_lblPosObj.btnRsCopyImage, {
+				resetFunc: _ => copyResultImageData(g_msgInfoObj.I_0001),
+			}), g_cssObj.button_Default_NoColor),
 	);
 
 	// マスクスプライトを作成
@@ -10484,7 +11294,7 @@ const resultInit = _ => {
 	g_animationData.forEach(sprite => {
 		if (g_scoreObj[`${sprite}ResultFrameNum`] === 0) {
 			if (g_headerObj[`${sprite}ResultData`][0] !== undefined) {
-				g_scoreObj[`${sprite}ResultFrameNum`] = drawSpriteData(0, `result`, sprite);
+				g_scoreObj[`${sprite}ResultFrameNum`] = g_animationFunc.draw[sprite](0, `result`, sprite);
 				g_headerObj[`${sprite}ResultData`][0] = undefined;
 			}
 		}
@@ -10498,7 +11308,7 @@ const resultInit = _ => {
 		// ユーザカスタムイベント(フレーム毎)
 		g_customJsObj.resultEnterFrame.forEach(func => func());
 
-		// 背景・マスクモーション
+		// 背景・マスクモーション、スキン変更
 		drawTitleResultMotion(g_currentPage);
 
 		// リザルト画面移行後のフェードアウト処理
@@ -10521,14 +11331,13 @@ const resultInit = _ => {
 		buffTime = thisTime - resultStartTime - g_scoreObj.resultFrameNum * 1000 / g_fps;
 
 		g_scoreObj.resultFrameNum++;
-		g_scoreObj.backResultFrameNum++;
-		g_scoreObj.maskResultFrameNum++;
-		g_timeoutEvtResultId = setTimeout(_ => flowResultTimeline(), 1000 / g_fps - buffTime);
+		g_animationData.forEach(sprite => g_scoreObj[`${sprite}ResultFrameNum`]++);
+		g_timeoutEvtResultId = setTimeout(flowResultTimeline, 1000 / g_fps - buffTime);
 	};
 	flowResultTimeline();
 
 	// キー操作イベント（デフォルト）
-	setShortcutEvent(g_currentPage);
+	setShortcutEvent(g_currentPage, _ => true, { dfEvtFlg: true });
 	document.oncontextmenu = _ => true;
 
 	g_skinJsObj.result.forEach(func => func());
@@ -10543,9 +11352,9 @@ const resultInit = _ => {
  * @param {string} _text
  * @param {string} _align
  */
-const makeCssResultPlayData = (_id, _x, _class, _heightPos, _text, _align = C_ALIGN_CENTER, { w = 400, siz = C_SIZ_MAIN } = {}) =>
+const makeCssResultPlayData = (_id, _x, _class, _heightPos, _text, _align = C_ALIGN_CENTER, { w = 400, siz = g_limitObj.mainSiz } = {}) =>
 	createDivCss2Label(_id, _text, {
-		x: _x, y: C_SIZ_SETMINI * _heightPos, w, h: C_SIZ_SETMINI, siz, align: _align,
+		x: _x, y: g_limitObj.setMiniSiz * _heightPos, w, h: g_limitObj.setMiniSiz, siz, align: _align,
 	}, _class);
 
 /**
@@ -10558,7 +11367,7 @@ const makeCssResultPlayData = (_id, _x, _class, _heightPos, _text, _align = C_AL
  * @param {string} _align
  */
 const makeCssResultSymbol = (_id, _x, _class, _heightPos, _text, _align = C_ALIGN_LEFT) =>
-	makeCssResultPlayData(_id, _x, _class, _heightPos, _text, _align, { w: 150, siz: C_SIZ_JDGCNTS });
+	makeCssResultPlayData(_id, _x, _class, _heightPos, _text, _align, { w: 150, siz: g_limitObj.jdgCntsSiz });
 
 // ライセンス原文、以下は削除しないでください
 /*-----------------------------------------------------------*/

@@ -1,7 +1,7 @@
-'use strict';
+﻿'use strict';
 /**
  * Dancing☆Onigiri 設定用jsファイル
- * Template Update: 2022/03/25 (v27.1.0)
+ * Template Update: 2023/06/24 (v32.5.0)
  * 
  * このファイルでは、作品全体に対しての初期設定を行うことができます。
  * 譜面データ側で個別に同様の項目が設定されている場合は、譜面データ側の設定が優先されます。
@@ -113,6 +113,13 @@ g_presetObj.gaugeList = {
 };
 */
 
+/**
+  空押し判定を行うか
+  判定させる場合は `true` を指定
+*/
+g_presetObj.excessiveJdgUse = `false`;
+
+
 /*
 ------------------------------------------------------------------------
    フリーズアロー設定 
@@ -136,7 +143,6 @@ g_presetObj.frzColors = true;
 */
 g_presetObj.frzStartjdgUse = `false`;
 
-
 /*
 ------------------------------------------------------------------------
    デフォルトデザイン・画像設定
@@ -153,7 +159,7 @@ g_presetObj.customDesignUse = {
 	back: `false`,
 	backMain: `false`,
 	ready: `false`,
-}
+};
 
 /**
   デフォルト画像セットの設定
@@ -187,6 +193,14 @@ g_presetObj.imageSets = [``, `classic,png`, `classic-thin,png`, `note,svg,false,
 */
 //g_presetObj.customImageList = [`ball`, `square`];
 
+/**
+ * 背景・マスクモーションで利用する「animationFillMode」のデフォルト値
+ * - none      : 初期画像へ戻す
+ * - forwards  : アニメーション100%の状態を維持（デフォルト）
+ * - backwards : アニメーション  0%の状態に戻す
+ */
+//g_presetObj.animationFillMode = `none`;
+
 
 /*
 ------------------------------------------------------------------------
@@ -205,6 +219,7 @@ g_presetObj.settingUse = {
 	shuffle: `true`,
 	autoPlay: `true`,
 	gauge: `true`,
+	excessive: `true`,
 	appearance: `true`,
 
 	//	stepZone: `true`,
@@ -361,7 +376,8 @@ g_presetObj.lblRenames = {
  * https://github.com/cwtickle/danoniplus/wiki/keys
  * https://github.com/cwtickle/danoniplus/wiki/tips-0004-extrakeys
  */
-g_presetObj.keysData = `
+
+ g_presetObj.keysData = `
 
 |keyExtraList=8,9j,9A,9B,12,12i,12F|
 |assist8=R-Onigiri::0,0,0,0,0,0,0,1|
