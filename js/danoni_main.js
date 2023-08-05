@@ -10954,11 +10954,11 @@ const resultInit = _ => {
 			);
 		}
 		multiAppend(resultWindow,
-			makeCssResultSymbol(`lblWCalc`, 420, g_cssObj.common_ii, 0, `W-Ratio`),
+			makeCssResultSymbol(`lblWCalc`, 420, g_cssObj.common_ii, 0, g_lblNameObj.j_wratio),
 			makeCssResultSymbol(`lblWCalcS`, 330, g_cssObj.score, 1, WifePercent, C_ALIGN_RIGHT),		
-			makeCssResultSymbol(`lblKCalc`, 420, g_cssObj.common_uwan, 2, `K-Ratio`),
+			makeCssResultSymbol(`lblKCalc`, 420, g_cssObj.common_uwan, 2, g_lblNameObj.j_kratio),
 			makeCssResultSymbol(`lblKCalcS`, 330, g_cssObj.score, 3, KaraPercent, C_ALIGN_RIGHT),	
-			makeCssResultSymbol(`lblGCalc`, 420, g_cssObj.common_shakin, 4, `Gauge`),
+			makeCssResultSymbol(`lblGCalc`, 420, g_cssObj.common_shakin, 4, g_lblNameObj.j_gauge),
 			makeCssResultSymbol(`lblGCalcS`, 330, g_cssObj.score, 5, GaugePercent, C_ALIGN_RIGHT),
 		);
 		if (g_stateObj.excessive === C_FLG_ON) {
