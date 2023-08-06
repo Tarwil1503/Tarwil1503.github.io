@@ -5572,7 +5572,7 @@ const setGauge = (_scrollNum, _gaugeInitFlg = false) => {
 
 		// ゲージ配列を入れ替え
 		g_settings.gauges = structuredClone(g_gaugeOptionObj[g_gaugeType.toLowerCase()]);
-		g_settings.gaugeNum = getCurrentNo(g_settings.gauges, g_stateObj.gauge);
+		g_settings.gaugeNum = 0;
 		g_stateObj.gauge = g_settings.gauges[g_settings.gaugeNum];
 	}
 	setSetting(_scrollNum, `gauge`);
