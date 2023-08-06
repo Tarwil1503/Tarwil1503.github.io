@@ -797,7 +797,7 @@ const g_stateObj = {
     shuffle: C_FLG_OFF,
     autoPlay: C_FLG_OFF,
     autoAll: C_FLG_OFF,
-    gauge: `Normal`,
+    gauge: ``,
     adjustment: 0,
     hitPosition: 0,
     fadein: 0,
