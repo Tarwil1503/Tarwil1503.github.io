@@ -16,94 +16,97 @@ const ImportedUnitList = [
 			BA: "001001_BA",
 			BS: "001001_BS",
 			SA: "001001_SA"
-		/*},
-		ability: {
-			onBattleStart: {
-				BuffBreakEffect: {
-					range: "Self",
-					amount: "100%"
-				}
-			},
-			onActionEnd: {
-				BuffSPDFixed: {
-					range: "Self",
-					turn: 2,
-					amount: 20,
-					condition: (battleState) => battleState.opponentTeam.getsBroken
-				}
-			}
-		}
-		supportAbility: {
-			onBattleStart: {
-				BuffBGDFixed: {
-					range: "Self",
-					amount: 2
-				},
-				BuffBreakEffect: {
-					range: "Self",
-					amount: "10%"
-				}
-			}
-		}
-		crystalis_EX: {
-			name: "クラスのみんなには内緒だよ",
-			effect: {
-				onActionEnd: {
-					BuffBGDRatio: {
-						range: "Self",
-						turn: 2,
-						amount: "30%"
-						condition: (battleState) => battleState.opponentTeam.getsBroken
-					}
-				},
-				onBattleStart: {
-					BuffBGDFixed: {
-						range: "Self",
-						amount: 5
-					}
-				}
-			}
 		},
-		ascensionEffect: {
-			1: {
-				onBattleStart: {
-					setMagic: {
-						range: "Self",
-						maxStack: 5
-					}
-				},
-				onActionEnd: {
-					gainMagic: {
-						range: "Self",
-						amount: 1,
-						condition: (battleState) => battleState.actor.skillType == "BS" && battleState.actor.isFriend
-					},
-					actAdditionalSkill: {
-						range: "Self",
-						id: "001001_FuA",
-						condition: (battleState) => battleState.self.magicStack == 5
-					}
-				}
-			},
-			2: {
-				onTurnStart: {
-					gainMPFixed: {
-						range: "Self",
-						amount: 5,
-						condition: (battleState) => battleState.self.isActor
-					}
-				}
-			},
-			4: {
-				onBattleStart: {
-					BuffBGDFixed: {
-						range: "Self",
-						amount: 5,
-						condition: (battleState) => battleState.self.isActor && battleState.actor.skillType == "AdditionalAct"
-					}
-				}	
-			}*/
-		}
+		ability: [
+            {
+                timing: "onBattleStart",
+                type: "BuffBreakEffect",
+                range: "Self",
+                amount: "100%"
+            },
+            {
+                timing: "onActionEnd",
+                type: "BuffSPDFixed",
+                range: "Self",
+                turn: 2,
+                amount: 20,
+                condition: (battleState) => battleState.opponentTeam.getsBroken
+            }
+        ],
+		ascensionEffect: [
+            {
+                ascension: 1,
+                timing: "onBattleStart",
+                type: "setMagic",
+                range: "Self",
+                maxStack: 5
+            },
+            {
+                ascension: 1,
+                timing: "onActionEnd",
+                type: "gainMagic",
+                range: "Self",
+                amount: 1,
+                condition: (battleState) => battleState.actor.skillType == "BS" && battleState.actor.isFriend
+            },
+            {
+                ascension: 1,
+                timing: "onActionEnd",
+                type: "actAdditionalSkill",
+                range: "Self",
+                id: "001001_FuA",
+                condition: (battleState) => battleState.self.magicStack == 5
+            },
+            {
+                ascension: 2,
+                timing: "onTurnStart",
+                type: "gainMPFixed",
+                range: "Self",
+                amount: 5,
+                condition: (battleState) => battleState.self.isActor
+            },
+            {
+                ascension: 4,
+                timing: "onBattleStart",
+                type: "BuffBGDFixed",
+                range: "Self",
+                amount: 5,
+                condition: (battleState) => battleState.self.isActor && battleState.actor.skillType == "AdditionalAct"
+            }
+        ],
+		supportAbility: [
+            {
+                timing: "onBattleStart",
+                type: "BuffBGDFixed",
+                range: "Self",
+                amount: 2
+            },
+            {
+                timing: "onBattleStart",
+                type: "BuffBreakEffect",
+                range: "Self",
+                amount: "10%"
+            }
+        ],
+        crystalis_EX: {
+            name: "クラスのみんなには内緒だよ",
+            effects: [
+                {
+                    timing: "onActionEnd",
+                    type: "BuffBGDRatio",
+                    range: "Self",
+                    turn: 2,
+                    amount: "30%",
+                    condition: (battleState) => battleState.opponentTeam.getsBroken
+                },
+                {
+                    timing: "onBattleStart",
+                    type: "BuffBGDFixed",
+                    range: "Self",
+                    amount: 5
+                }
+            ]
+        }
     },
     {
 		id: "001002", 

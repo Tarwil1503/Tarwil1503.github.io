@@ -520,6 +520,26 @@
 			object-fit: cover;
 			background-color: #e2e8f0;
 		}
+		
+		/* タイムライン用アイコン枠のスタイル */
+		.timeline-icon-wrapper {
+			width: 31px;
+			height: 31px;
+			border-radius: 50%;
+			border: 2px solid transparent; /* 初期値 */
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			box-sizing: border-box;
+		}
+
+		.timeline-icon-wrapper.team-ally {
+			border-color: #3b82f6; /* 青 */
+		}
+
+		.timeline-icon-wrapper.team-enemy {
+			border-color: #ef4444; /* 赤 */
+		}
 
 		.timeline-av {
 			font-size: 15px;
@@ -569,9 +589,17 @@
 			box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 		}
 
-		/* 行動者（Actor）のアイコンの縁を赤色で太くする（TL側には適用されない） */
-		.sim-slot.actor-highlight {
-			border-color: #ef4444 !important;
+		/* Actorの枠色定義 */
+		.sim-slot.actor-highlight-ally {
+			border-color: #3b82f6 !important; /* 青 */
+		}
+		.sim-slot.actor-highlight-enemy {
+			border-color: #ef4444 !important; /* 赤 */
+		}
+
+		/* Targetの枠色定義 */
+		.sim-slot.target-highlight {
+			border-color: #22c55e !important; /* 緑 */
 		}
 
 		.sim-unit-img {
@@ -626,10 +654,6 @@
 		}
 		.sim-btn.btn-secondary:hover {
 			background-color: #475569;
-		}
-		/* ターゲットとして選択されたユニットのアイコンの縁を青色で太くする */
-		.sim-slot.target-highlight {
-			border-color: #3b82f6 !important;
 		}
 
 		/* 選択可能なOpponentスロットに対するマウスホバー時の効果 */
@@ -864,15 +888,20 @@
             // グローバル変数にjs側で定義したデータを代入
             UnitList = ImportedUnitList;
 
-            UnitList.forEach(unit => {
-                unitDetailsData[unit.id] = {
-                    unitId: unit.id,
-                    ascension: 5,
-                    level: 140,
-                    heartLevel: 50,
-                    magicRelease: 130,
-                    skillLevel: 10
-                };
+            // unitDetailsDataはスロット識別子 "team-slotIndex" をキーに初期化する
+            // 例: "ally-0", "enemy-2"
+            ['ally', 'enemy'].forEach(team => {
+                for (let i = 0; i < 5; i++) {
+                    const key = `${team}-${i}`;
+                    unitDetailsData[key] = {
+                        unitId: null,
+                        ascension: 5,
+                        level: 140,
+                        heartLevel: 50,
+                        magicRelease: 130,
+                        skillLevel: 10
+                    };
+                }
             });
                 
             console.log(`Loaded ${UnitList.length} units successfully`);
@@ -956,9 +985,9 @@
             // ユニット一覧を生成
             createUnitListInModal();
             
-            // パラメータ欄を初期化
+            // パラメータ欄を初期化（スロットキーで参照）
             if (currentModal.selectedUnitId) {
-                updateParamSection(currentModal.selectedUnitId);
+                updateParamSection(currentModal.selectedUnitId, team, slotIndex);
             } else {
                 clearParamSection();
             }
@@ -1020,17 +1049,18 @@
                 selectedElement.classList.add('selected');
             }
             
-            // パラメータセクションを更新
-            updateParamSection(unitId);
+            // パラメータセクションを更新（スロットキーで参照）
+            updateParamSection(unitId, currentModal.team, currentModal.slotIndex);
             
             // 確定ボタンを有効化
             document.getElementById('confirmBtn').disabled = false;
         }
 
         // ==================== パラメータセクション ====================
-        function updateParamSection(unitId) {
+        function updateParamSection(unitId, team, slotIndex) {
+            const slotKey = `${team}-${slotIndex}`;
             const paramsSection = document.getElementById('unitParamsSection');
-            const details = unitDetailsData[unitId];
+            const details = unitDetailsData[slotKey];
             
             paramsSection.innerHTML = `
                 <h4>Kioku Parameters</h4>
@@ -1088,7 +1118,8 @@
 
         function updateascension(value) {
             value = Math.max(0, Math.min(5, parseInt(value) || 0));
-            unitDetailsData[currentModal.selectedUnitId].ascension = value;
+            const slotKey = `${currentModal.team}-${currentModal.slotIndex}`;
+            unitDetailsData[slotKey].ascension = value;
             document.getElementById('paramascension').value = value;
             updateSkillLevelCap(value);
         }
@@ -1107,7 +1138,8 @@
                 const currentValue = parseInt(skillInput.value) || 1;
                 if (currentValue > cap) {
                     skillInput.value = cap;
-                    unitDetailsData[currentModal.selectedUnitId].skillLevel = cap;
+                    const slotKey = `${currentModal.team}-${currentModal.slotIndex}`;
+                    unitDetailsData[slotKey].skillLevel = cap;
                 }
             }
         }
@@ -1118,7 +1150,8 @@
             const cap = skilLevelCaps[ascension];
             value = Math.max(1, Math.min(cap, value));
             
-            unitDetailsData[currentModal.selectedUnitId].skillLevel = value;
+            const slotKey = `${currentModal.team}-${currentModal.slotIndex}`;
+            unitDetailsData[slotKey].skillLevel = value;
             document.getElementById('paramSkillLevel').value = value;
         }
 
@@ -1139,7 +1172,8 @@
                 if (input) input.value = parsed;
             }
             
-            unitDetailsData[currentModal.selectedUnitId][key] = parsed;
+            const slotKey = `${currentModal.team}-${currentModal.slotIndex}`;
+            unitDetailsData[slotKey][key] = parsed;
         }
 
         // ==================== 配置・スロット交換ロジック ====================
@@ -1156,6 +1190,17 @@
                 teamState[team][duplicateIndex] = currentUnitId;
                 teamState[team][targetIndex] = nextUnitId;
                 
+                // unitDetailsDataもスロットごと入れ替える
+                const keyA = `${team}-${duplicateIndex}`;
+                const keyB = `${team}-${targetIndex}`;
+                const tmpDetails = { ...unitDetailsData[keyA] };
+                unitDetailsData[keyA] = { ...unitDetailsData[keyB] };
+                unitDetailsData[keyB] = tmpDetails;
+
+                // 入れ替え後にunitIdを正しく書き直す
+                unitDetailsData[keyA].unitId = currentUnitId;
+                unitDetailsData[keyB].unitId = nextUnitId;
+
                 updateSlotDisplay(team, duplicateIndex);
                 updateSlotDisplay(team, targetIndex);
             } else {
@@ -1179,6 +1224,10 @@
 
                 const team = currentModal.team;
                 const index = currentModal.slotIndex;
+                const slotKey = `${team}-${index}`;
+
+                // スロットに紐付けられた詳細データにunitIdを記録
+                unitDetailsData[slotKey].unitId = currentModal.selectedUnitId;
                 
                 // 交換ロジック付きの配置関数を適用
                 assignUnitWithSwap(team, index, currentModal.selectedUnitId);
@@ -1190,10 +1239,11 @@
         // ==================== スロット表示更新 ====================
         function updateSlotDisplay(team, slotIndex) {
             const unitId = teamState[team][slotIndex];
+            const slotKey = `${team}-${slotIndex}`;
             
             if (unitId) {
                 const unit = UnitList.find(u => u.id === unitId);
-                const details = unitDetailsData[unitId];
+                const details = unitDetailsData[slotKey];
                 
                 // スロット内の画像とテキストを更新
                 const slot = document.querySelector(`[data-team="${team}"][data-index="${slotIndex}"]`);
@@ -1252,6 +1302,8 @@
 
         function clearUnit(team, slotIndex) {
             teamState[team][slotIndex] = null;
+            // スロットのunitIdをリセット（パラメータ値は残す）
+            unitDetailsData[`${team}-${slotIndex}`].unitId = null;
             updateSlotDisplay(team, slotIndex);
         }
 
@@ -1461,6 +1513,8 @@
 				if (unitId !== null) {
 					const unitBase = ImportedUnitList.find(u => u.id === unitId);
 					if (unitBase) {
+						const slotKey = `enemy-${i}`;
+						const details = unitDetailsData[slotKey];
 						battleState.timeline.push({
 							id: unitId,
 							name: unitBase.name,
@@ -1468,7 +1522,13 @@
 							slotIndex: i,
 							tp: i + 1,
 							spd: unitBase.spd,
-							av: 10000 / unitBase.spd // 初期値設定
+							av: 10000 / unitBase.spd, // 初期値設定
+							// 編成画面で設定したパラメータをタイムラインノードに載せる
+							ascension: details.ascension,
+							level: details.level,
+							heartLevel: details.heartLevel,
+							magicRelease: details.magicRelease,
+							skillLevel: details.skillLevel
 						});
 					}
 				}
@@ -1480,6 +1540,8 @@
 				if (unitId !== null) {
 					const unitBase = ImportedUnitList.find(u => u.id === unitId);
 					if (unitBase) {
+						const slotKey = `ally-${i}`;
+						const details = unitDetailsData[slotKey];
 						battleState.timeline.push({
 							id: unitId,
 							name: unitBase.name,
@@ -1487,11 +1549,49 @@
 							slotIndex: i,
 							tp: i + 6,
 							spd: unitBase.spd,
-							av: 10000 / unitBase.spd // 初期値設定
+							av: 10000 / unitBase.spd, // 初期値設定
+							// 編成画面で設定したパラメータをタイムラインノードに載せる
+							ascension: details.ascension,
+							level: details.level,
+							heartLevel: details.heartLevel,
+							magicRelease: details.magicRelease,
+							skillLevel: details.skillLevel
 						});
 					}
 				}
 			}
+			
+			// TP順の走査とonBattleStart効果の適用
+			// タイムラインノード自身がパラメータを持っているので、そこから ascension を参照する
+			const allUnits = battleState.timeline
+				.slice()
+				.sort((a, b) => a.tp - b.tp);
+
+			allUnits.forEach(u => {
+				const unitData = ImportedUnitList.find(data => data.id === u.id);
+				if (!unitData) return;
+
+				// タイムラインノードから凸数を取得
+				const currentAscension = u.ascension;
+
+				// ability の処理
+				if (Array.isArray(unitData.ability)) {
+					unitData.ability
+						.filter(effect => effect.timing === "onBattleStart")
+						.forEach(effect => {
+							executeEffect(effect, u);
+						});
+				}
+
+				// ascensionEffect の処理：そのユニットの凸数以下のエフェクトのみ適用
+				if (Array.isArray(unitData.ascensionEffect)) {
+					unitData.ascensionEffect
+						.filter(effect => effect.ascension <= currentAscension && effect.timing === "onBattleStart")
+						.forEach(effect => {
+							executeEffect(effect, u);
+						});
+				}
+			});
 
 			// 初期ソートを実行
 			sortTimeline();
@@ -1506,6 +1606,11 @@
 				// 減算により残りAVが0になった先頭のユニットが、このターンの「現在のActor」となる
 				battleState.currentActor = battleState.timeline[0];
 			}
+		}
+		
+		function executeEffect(effect, unitInfo) {
+			console.log(`[Effect Apply] TP:${unitInfo.tp} [${unitInfo.team} Slot:${unitInfo.slotIndex}] -> Type: ${effect.type}`);
+			// ここに具体的なステータス加算やフラグ付与のロジックを記述します
 		}
 		
 		/**
@@ -1741,7 +1846,7 @@
 
 			let activeItemEl = null;
 
-			// 【要件1】初期状態を表す不変の項目 "0. Battle Start" を先頭に固定配置
+			// 初期状態を表す不変の項目 "0. Battle Start" を先頭に固定配置
 			const startLogItem = document.createElement('div');
 			startLogItem.className = 'action-log-item';
 			startLogItem.textContent = "0. Battle Start";
@@ -1767,9 +1872,10 @@
 				const actorName = state.currentActor ? state.currentActor.name : 'Unknown';
 				const targetName = state.selectedTarget ? state.selectedTarget.id : 'None'; 
 				const targetUnit = ImportedUnitList.find(u => u.id === targetName);
-				const targetFullName = targetUnit ? targetUnit.name : 'Unknown';
+				const targetFullName = targetUnit ? targetUnit.name : 'Unknown';				
 
 				logItem.textContent = `${idx + 1}. ${actorName} → ${targetFullName}, BA`;
+				
 				logItem.onclick = () => jumpToHistoryStep(idx);
 				actionLogEl.appendChild(logItem);
 			});
@@ -1801,20 +1907,27 @@
 			// 1. 左側タイムライン（TL）の描画
 			const timelineEl = document.getElementById('simTimeline');
 			timelineEl.innerHTML = '';
+			
 			displayTimeline.forEach(node => {
 				const item = document.createElement('div');
 				item.className = 'timeline-item';
+				
 				const unitBase = ImportedUnitList.find(u => u.id === node.id);
 				const imgSrc = unitBase ? unitBase.image : '';
 
-				// 小数第6位までを厳密に計算（7位以下切り捨て処理）
+				// AV表示ロジック（そのまま）
 				const truncatedAv = Math.floor(node.av * 1000000) / 1000000;
-				
-				// 【要件3】フラグの状態によって、整数表示か小数第6位表示かを切り分ける
-				const avDisplayString = showDecimal ? truncatedAv.toFixed(6) : Math.floor(node.av).toString();
+				const isActor = (currentActor && node.team === currentActor.team && node.slotIndex === currentActor.slotIndex);
+				let avDisplayString = (isActor && !battleState.selectedTarget) 
+					? "Actor" 
+					: (showDecimal ? truncatedAv.toFixed(6) : Math.floor(node.av).toString());
 
+				// アイコンを枠付きのラッパーで囲む
+				const teamClass = node.team === 'ally' ? 'team-ally' : 'team-enemy';
 				item.innerHTML = `
-					<img src="${imgSrc}" alt="${node.name}" class="timeline-icon">
+					<div class="timeline-icon-wrapper ${teamClass}">
+						<img src="${imgSrc}" alt="${node.name}" class="timeline-icon" style="width: 28px; height: 28px; border-radius: 50%;">
+					</div>
 					<span class="timeline-av">${avDisplayString}</span>
 				`;
 				timelineEl.appendChild(item);
@@ -1830,7 +1943,7 @@
 				const tp = i + 1;
 
 				if (currentActor && currentActor.team === 'enemy' && currentActor.slotIndex === i) {
-					slot.classList.add('actor-highlight');
+					slot.classList.add('actor-highlight-enemy');
 				}
 				if (battleState.selectedTarget && battleState.selectedTarget.team === 'enemy' && battleState.selectedTarget.slotIndex === i) {
 					slot.classList.add('target-highlight');
@@ -1861,7 +1974,7 @@
 				const tp = i + 6;
 
 				if (currentActor && currentActor.team === 'ally' && currentActor.slotIndex === i) {
-					slot.classList.add('actor-highlight');
+					slot.classList.add('actor-highlight-ally');
 				}
 				if (battleState.selectedTarget && battleState.selectedTarget.team === 'ally' && battleState.selectedTarget.slotIndex === i) {
 					slot.classList.add('target-highlight');
