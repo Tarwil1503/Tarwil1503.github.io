@@ -691,6 +691,18 @@
 			font-weight: bold;
 			color: #4f46e5;
 		}
+		
+		/* 編成画面用ラッパーの設定 */
+		.formation-layout-wrapper {
+			width: 100%;
+			overflow: hidden; /* スケール縮小時のはみ出しを防止 */
+		}
+
+		/* スケールを直接適用するターゲット要素（初期状態） */
+		.formation-layout-content {
+			width: 100%;
+			display: block;
+		}
     </style>
     <script src="unitlist.js"></script>
 </head>
@@ -702,15 +714,26 @@
 			<div id="errorStatus" class="error-message" style="display: none;"></div>
 
 			<div id="mainContent" style="display: none;">
-				<div class="main-grid">
-					<div class="team-section ally">
-						<h2>味方チーム</h2>
-						<div class="unit-slots" id="allySlots"></div>
-					</div>
+				<div class="formation-layout-wrapper">
+					<div class="formation-layout-content">
+						<div class="main-grid">
+							<div class="team-section ally">
+								<h2>味方チーム</h2>
+								<div class="unit-slots" id="allySlots"></div>
+							</div>
 
-					<div class="team-section enemy">
-						<h2>敵チーム</h2>
-						<div class="unit-slots" id="enemySlots"></div>
+							<div class="team-section enemy">
+								<h2>敵チーム</h2>
+								<div class="unit-slots" id="enemySlots"></div>
+							</div>
+						</div>
+
+						<div class="validation-message" id="validationMessage"></div>
+
+						<div class="bottom-section">
+							<button class="btn btn-large btn-simulate" onclick="startSimulation()">Start Simulation</button>
+							<button class="btn btn-large btn-reset" onclick="resetAllTeams()">Reset</button>
+						</div>
 					</div>
 				</div>
 
@@ -719,7 +742,6 @@
 						<h3 id="modalTitle">Unit Selection</h3>
 						<div class="modal-body">
 							<div class="unit-list-section" id="unitListSection"></div>
-							
 							<div class="unit-params-section" id="unitParamsSection"></div>
 						</div>
 						<div class="modal-buttons">
@@ -729,12 +751,6 @@
 					</div>
 				</div>
 
-				<div class="validation-message" id="validationMessage"></div>
-
-				<div class="bottom-section">
-					<button class="btn btn-large btn-simulate" onclick="startSimulation()">Start Simulation</button>
-					<button class="btn btn-large btn-reset" onclick="resetAllTeams()">Reset</button>
-				</div>
 			</div>
 		</div>
 	</div>
@@ -785,6 +801,7 @@
         // ==================== グローバル変数 ====================
         let UnitList = [];
 		let showDecimal = false; // 小数表示フラグ
+		const BASE_WIDTH = 1050;
 
         // 編成データ管理
         const teamState = {
@@ -821,6 +838,13 @@
                 // ローディング表示を非表示、メインコンテンツを表示
                 document.getElementById('loadingStatus').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
+				
+				// ウィンドウのリサイズイベントを共通のスケール調整関数にバインド
+				window.removeEventListener('resize', adjustAllScreensScale);
+				window.addEventListener('resize', adjustAllScreensScale);
+				
+				// 画面初期表示後に縮小を一度計算
+				setTimeout(adjustAllScreensScale, 100);
             } catch (error) {
                 console.error('Initialization error:', error);
                 showError('キオクデータ読み込み失敗: ' + error.message);
@@ -1273,7 +1297,6 @@
 				document.getElementById('formation-screen').style.display = 'none';
 				document.getElementById('simulation-screen').style.display = 'block';
 				
-				// 状態のリセット
 				historySequence = [];
 				historyIndex = -1;
 				showDecimal = false; 
@@ -1289,15 +1312,14 @@
 				onBattleStart();
 				renderSimulationScreen();
 				
-				// 各種イベントリスナーの登録（重複防止のため一度削除してから登録）
+				// キーボードショートカットのリスナーを登録
 				window.removeEventListener('keydown', handleKeyDown);
 				window.addEventListener('keydown', handleKeyDown);
 				
-				window.removeEventListener('resize', adjustSimulationScale);
-				window.addEventListener('resize', adjustSimulationScale);
-				
-				// 描画完了後に縮小処理を確実に適用するため、僅かなディレイを入れて実行
-				setTimeout(adjustSimulationScale, 50);
+				// シミュレーション画面への切り替えに伴い、スケールを即時再計算
+				adjustAllScreensScale();
+				// DOMの反映を考慮し時間差でもう一度実行
+				setTimeout(adjustAllScreensScale, 50);
 			}
 		}
 		
@@ -1334,35 +1356,55 @@
 		}
 
 		/**
-		 * ウィンドウの横幅に応じてレイアウト全体を枠内に収める縮小関数
+		 * 編成画面およびシミュレーション画面の動的スケーリングを一元管理する関数
 		 */
-		function adjustSimulationScale() {
-			const simLayout = document.querySelector('.sim-layout');
-			if (!simLayout) return;
-			
-			const wrapper = simLayout.parentElement;
-			if (!wrapper) return;
-			
-			// シミュレーターのコンテナ群が横並びを維持するために必要な基準最小横幅
-			// (行動表・TL・編成の各幅の合計。環境に合わせて数値を固定)
-			const baseWidth = 960; 
-			const currentWrapperWidth = wrapper.clientWidth;
-			
-			if (currentWrapperWidth < baseWidth) {
-				// 横幅が不足している場合、はみ出さない比率を計算して縮小(scale)を適用
-				const scale = currentWrapperWidth / baseWidth;
-				simLayout.style.transform = `scale(${scale})`;
-				simLayout.style.transformOrigin = 'top left';
-				simLayout.style.width = `${baseWidth}px`;
+		function adjustAllScreensScale() {
+			// 1. 編成画面（Formation Screen）の縮小処理
+			const formationScreen = document.getElementById('formation-screen');
+			if (formationScreen && formationScreen.style.display !== 'none') {
+				const formationContent = document.querySelector('.formation-layout-content');
+				const wrapper = document.querySelector('.formation-layout-wrapper');
 				
-				// scale適用によって下部に生じる不要な余白、または高さの潰れを補正
-				wrapper.style.height = `${simLayout.offsetHeight * scale}px`;
-			} else {
-				// 十分な横幅がある場合は等倍(100%)に戻す
-				simLayout.style.transform = 'none';
-				simLayout.style.transformOrigin = 'initial';
-				simLayout.style.width = 'auto';
-				wrapper.style.height = 'auto';
+				if (formationContent && wrapper) {
+					const currentWrapperWidth = wrapper.clientWidth;
+					
+					if (currentWrapperWidth < BASE_WIDTH) {
+						const scale = currentWrapperWidth / BASE_WIDTH;
+						formationContent.style.transform = `scale(${scale})`;
+						formationContent.style.transformOrigin = 'top left';
+						formationContent.style.width = `${BASE_WIDTH}px`;
+						wrapper.style.height = `${formationContent.offsetHeight * scale}px`;
+					} else {
+						formationContent.style.transform = 'none';
+						formationContent.style.transformOrigin = 'initial';
+						formationContent.style.width = '100%';
+						wrapper.style.height = 'auto';
+					}
+				}
+			}
+
+			// 2. シミュレーション画面（Timeline Mode）の縮小処理
+			const simScreen = document.getElementById('simulation-screen');
+			if (simScreen && simScreen.style.display !== 'none') {
+				const simLayout = document.querySelector('.sim-layout');
+				const wrapper = document.querySelector('.sim-layout-wrapper');
+				
+				if (simLayout && wrapper) {
+					const currentWrapperWidth = wrapper.clientWidth;
+					
+					if (currentWrapperWidth < BASE_WIDTH) {
+						const scale = currentWrapperWidth / BASE_WIDTH;
+						simLayout.style.transform = `scale(${scale})`;
+						simLayout.style.transformOrigin = 'top left';
+						simLayout.style.width = `${BASE_WIDTH}px`;
+						wrapper.style.height = `${simLayout.offsetHeight * scale}px`;
+					} else {
+						simLayout.style.transform = 'none';
+						simLayout.style.transformOrigin = 'initial';
+						simLayout.style.width = 'auto';
+						wrapper.style.height = 'auto';
+					}
+				}
 			}
 		}
 		
@@ -1471,9 +1513,13 @@
 		 */
 		function returnToFormation() {
 			window.removeEventListener('keydown', handleKeyDown);
-			window.removeEventListener('resize', adjustSimulationScale);
+			
 			document.getElementById('simulation-screen').style.display = 'none';
 			document.getElementById('formation-screen').style.display = 'block';
+			
+			// 編成画面への切り替えに伴い、スケールを即時再計算
+			adjustAllScreensScale();
+			setTimeout(adjustAllScreensScale, 50);
 		}
 
 		/**
