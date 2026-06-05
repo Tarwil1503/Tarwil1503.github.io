@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magia Exedra Simulator - Team Composition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .loading-message {
+            text-align: center;
+            color: #667eea;
+            font-size: 16px;
+            padding: 20px;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #f44336;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .team-section {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+
+        .team-section h2 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            color: #333;
+        }
+
+        .team-section.ally h2 {
+            border-bottom-color: #4CAF50;
+        }
+
+        .team-section.enemy h2 {
+            border-bottom-color: #f44336;
+        }
+
+        .unit-slots {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .unit-slot {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 120px;
+        }
+
+        .unit-slot:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+            transform: translateX(4px);
+        }
+
+        .unit-slot.selected {
+            border-color: #667eea;
+            background: #e8effe;
+        }
+
+        .slot-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: #667eea;
+            color: white;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .slot-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .unit-image-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .unit-thumbnail {
+            width: 96px;
+            height: 96px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid #ddd;
+            flex-shrink: 0;
+        }
+
+        .unit-thumbnail.empty {
+            background: #eee;
+        }
+
+        .unit-info {
+            flex: 1;
+        }
+
+        .unit-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .unit-name.empty {
+            color: #aaa;
+            font-style: italic;
+        }
+
+        .unit-stats {
+            font-size: 11px;
+            color: #666;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            margin-top: 4px;
+        }
+
+        .unit-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .unit-stat-label {
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .clear-btn {
+            padding: 6px 12px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+            flex-shrink: 0;
+            align-self: flex-start;
+            margin-top: 6px;
+        }
+
+        .clear-btn:hover {
+            background: #d32f2f;
+        }
+
+        .clear-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* ユニット選択モーダル */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-content h3 {
+            margin-bottom: 20px;
+            font-size: 18px;
+            color: #333;
+        }
+
+        .modal-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            flex: 1;
+            min-height: 500px;
+        }
+
+        .unit-list-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .unit-list-section::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .unit-list-section::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .unit-list-section::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .unit-list-section::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .unit-option {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .unit-option:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .unit-option.selected {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .unit-option-image {
+            width: 96px;
+            height: 96px;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .unit-option-name {
+            font-size: 13px;
+            font-weight: bold;
+            text-align: center;
+            word-break: break-word;
+        }
+
+        .unit-params-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .unit-params-section h4 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .param-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .param-label {
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .param-sublabel {
+            font-size: 11px;
+            color: #666;
+            margin-top: -4px;
+        }
+
+        .param-input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 100%;
+        }
+
+        .param-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 4px rgba(102, 126, 234, 0.3);
+        }
+
+        .param-input:disabled {
+            background: #eee;
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: flex-end;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-confirm {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-confirm:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        .btn-confirm:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-cancel {
+            background: #eee;
+            color: #333;
+        }
+
+        .btn-cancel:hover {
+            background: #ddd;
+        }
+
+        .bottom-section {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .btn-large {
+            padding: 12px 30px;
+            font-size: 16px;
+        }
+
+        .btn-simulate {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-simulate:hover {
+            background: #45a049;
+        }
+
+        .btn-reset {
+            background: #ff9800;
+            color: white;
+        }
+
+        .btn-reset:hover {
+            background: #e68900;
+        }
+
+        .validation-message {
+            text-align: center;
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .validation-message.error {
+            background: #ffebee;
+            color: #c62828;
+            display: block;
+        }
+
+        .validation-message.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            display: block;
+        }
+		/* シミュレーション画面用のレイアウト設定 */
+		.sim-layout {
+			display: flex;
+			gap: 50px;
+			margin-top: 20px;
+		}
+		
+		/* 小数表示切り替えボタンのスタイル */
+		.sim-btn-toggle {
+			display: block;
+			width: 100%;
+			margin-top: 4px;
+			margin-bottom: 8px;
+			padding: 4px 8px;
+			font-size: 11px;
+			background-color: #f1f5f9;
+			border: 1px solid #cbd5e1;
+			border-radius: 4px;
+			cursor: pointer;
+			text-align: center;
+			user-select: none;
+			transition: all 0.2s ease;
+		}
+		.sim-btn-toggle:hover {
+			background-color: #e2e8f0;
+		}
+
+		/* ウィンドウ幅不足時の縮小用ラッパーの設定 */
+		.sim-layout-wrapper {
+			width: 100%;
+			overflow: hidden; /* スケール縮小時のはみ出しを防止 */
+		}
+
+		/* 左側：タイムライン領域 */
+		.sim-timeline-container {
+			min-width: 160px;
+		}
+
+		.sim-timeline {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+			margin-top: 15px;
+		}
+
+		.timeline-item {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+
+		/* TL内のユニットアイコンは円形 32x32 */
+		.timeline-icon {
+			width: 32px;
+			height: 32px;
+			border-radius: 50%;
+			object-fit: cover;
+			background-color: #e2e8f0;
+		}
+
+		.timeline-av {
+			font-size: 15px;
+			font-weight: bold;
+			color: #1e293b;
+		}
+
+		/* 右側：敵味方編成配置領域（右寄せ） */
+		.sim-teams-container {
+			flex-grow: 1;
+			display: flex;
+			flex-direction: column;
+			gap: 30px;
+			align-items: flex-start;
+			padding-left: 20px;
+		}
+
+		.sim-team-section {
+			width: 100%;
+		}
+
+		.sim-team-section h4 {
+			margin-bottom: 10px;
+			color: #475569;
+		}
+
+		.sim-team-row {
+			display: flex;
+			gap: 15px;
+			background: #f8fafc;
+			padding: 15px;
+			border-radius: 8px;
+			border: 1px solid #e2e8f0;
+		}
+
+		/* 敵味方編成側のスロット（既存の編成画面と同じサイズ感を想定） */
+		.sim-slot {
+			width: 80px;
+			height: 80px;
+			border: 3px solid transparent; /* 普段は透明な縁 */
+			border-radius: 8px;
+			position: relative;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			background: #ffffff;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+		}
+
+		/* 行動者（Actor）のアイコンの縁を赤色で太くする（TL側には適用されない） */
+		.sim-slot.actor-highlight {
+			border-color: #ef4444 !important;
+		}
+
+		.sim-unit-img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			border-radius: 4px;
+		}
+
+		.sim-slot-tp {
+			position: absolute;
+			bottom: 2px;
+			right: 4px;
+			font-size: 9px;
+			color: #94a3b8;
+			background: rgba(255,255,255,0.9);
+			padding: 0 3px;
+			border-radius: 3px;
+		}
+
+		/* コントロールボタン */
+		.sim-controls {
+			margin-top: 15px;
+			display: flex;
+			gap: 15px;
+		}
+
+		.sim-btn {
+			padding: 10px 24px;
+			font-size: 16px;
+			font-weight: bold;
+			cursor: pointer;
+			border: none;
+			border-radius: 6px;
+			background-color: #4f46e5;
+			color: white;
+			transition: background-color 0.2s;
+		}
+
+		.sim-btn:hover {
+			background-color: #4338ca;
+		}
+
+		.sim-btn:disabled {
+			background-color: #cbd5e1;
+			color: #94a3b8;
+			cursor: not-allowed;
+		}
+
+		.sim-btn.btn-secondary {
+			background-color: #64748b;
+		}
+		.sim-btn.btn-secondary:hover {
+			background-color: #475569;
+		}
+		/* ターゲットとして選択されたユニットのアイコンの縁を青色で太くする */
+		.sim-slot.target-highlight {
+			border-color: #3b82f6 !important;
+		}
+
+		/* 選択可能なOpponentスロットに対するマウスホバー時の効果 */
+		.sim-slot.selectable-opponent {
+			cursor: pointer;
+		}
+		.sim-slot.selectable-opponent:hover {
+			background: #eff6ff;
+		}
+		
+		/* 行動表全体のコンテナ定義 */
+		.sim-action-log-container {
+			min-width: 240px;
+			max-width: 300px;
+			display: flex;
+			flex-direction: column;
+		}
+
+		/* 行動表の枠組みを固定化し、スクロールを強制 */
+		.sim-action-log {
+			display: flex;
+			flex-direction: column;
+			gap: 4px;
+			margin-top: 15px;
+			height: 400px;           /* 高さを400pxに完全に固定 */
+			max-height: 400px;
+			overflow-y: auto;        /* 枠を超えたら自動で縦スクロールを表示 */
+			border: 1px solid #cbd5e1;
+			border-radius: 6px;
+			padding: 6px;
+			background: #f8fafc;
+		}
+
+		/* 各行のスタイル */
+		.action-log-item {
+			font-size: 13px;
+			padding: 6px 10px;
+			border-radius: 4px;
+			cursor: pointer;
+			background: #ffffff;
+			border: 1px solid #e2e8f0;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			user-select: none;
+			
+			/* 要素が枠内で潰されるのを防ぐ */
+			flex-shrink: 0;          
+		}
+
+		.action-log-item:hover {
+			background: #f1f5f9;
+			border-color: #cbd5e1;
+		}
+
+		.action-log-item.current-step {
+			background: #e0e7ff;
+			border-color: #6366f1;
+			font-weight: bold;
+			color: #4f46e5;
+		}
+    </style>
+    <script src="unitlist.js"></script>
+</head>
+<body>
+	<div id="formation-screen">
+		<div class="container">
+			<h1>Magia Exedra Simulator</h1>
+			<div id="loadingStatus" class="loading-message">キオクデータ読み込み中...</div>
+			<div id="errorStatus" class="error-message" style="display: none;"></div>
+
+			<div id="mainContent" style="display: none;">
+				<div class="main-grid">
+					<div class="team-section ally">
+						<h2>味方チーム</h2>
+						<div class="unit-slots" id="allySlots"></div>
+					</div>
+
+					<div class="team-section enemy">
+						<h2>敵チーム</h2>
+						<div class="unit-slots" id="enemySlots"></div>
+					</div>
+				</div>
+
+				<div class="modal" id="unitModal">
+					<div class="modal-content">
+						<h3 id="modalTitle">Unit Selection</h3>
+						<div class="modal-body">
+							<div class="unit-list-section" id="unitListSection"></div>
+							
+							<div class="unit-params-section" id="unitParamsSection"></div>
+						</div>
+						<div class="modal-buttons">
+							<button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+							<button class="btn btn-confirm" id="confirmBtn" onclick="confirmUnitSelection()" disabled>Confirm</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="validation-message" id="validationMessage"></div>
+
+				<div class="bottom-section">
+					<button class="btn btn-large btn-simulate" onclick="startSimulation()">Start Simulation</button>
+					<button class="btn btn-large btn-reset" onclick="resetAllTeams()">Reset</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<div id="simulation-screen" style="display: none;">
+		<div class="container">
+			<h1>Magia Exedra Simulator - Timeline Mode</h1>
+			
+			<div class="sim-layout-wrapper">
+				<div class="sim-layout">
+					
+					<div class="sim-action-log-container">
+						<h3>Action Log</h3>
+						<div id="simActionLog" class="sim-action-log"></div>
+					</div>
+
+					<div class="sim-timeline-container">
+						<h3>Timeline</h3>
+						<button id="btnToggleDecimal" class="sim-btn-toggle" onclick="toggleDecimalDisplay()">小数表示: OFF</button>
+						<div id="simTimeline" class="sim-timeline"></div>
+					</div>
+					
+					<div class="sim-teams-container">
+						<div class="sim-team-section">
+							<h4>Enemy Team (TP 1 - 5)</h4>
+							<div id="simEnemyTeam" class="sim-team-row"></div>
+						</div>
+						
+						<div class="sim-team-section">
+							<h4>Ally Team (TP 6 - 10)</h4>
+							<div id="simAllyTeam" class="sim-team-row"></div>
+						</div>
+						
+						<div class="sim-controls">
+							<button id="btnReset" class="sim-btn btn-secondary" onclick="resetToStart()">最初に戻る</button>
+							<button id="btnBackup" class="sim-btn" onclick="backupTurn()">戻る (←)</button>
+							<button id="btnProceed" class="sim-btn" onclick="proceedTurnUI()">進む (→)</button>
+							<button class="sim-btn btn-secondary" onclick="returnToFormation()">編成に戻る</button>
+						</div>
+					</div>
+
+				</div>
+			</div>
+		</div>
+	</div>
+
+    <script>
+        // ==================== グローバル変数 ====================
+        let UnitList = [];
+		let showDecimal = false; // 小数表示フラグ
+
+        // 編成データ管理
+        const teamState = {
+            ally: [null, null, null, null, null],
+            enemy: [null, null, null, null, null]
+        };
+
+        // ユニット詳細データ構造
+        const unitDetailsData = {};
+
+        // モーダル用のデータ
+        let currentModal = {
+            team: null,
+            slotIndex: null,
+            selectedUnitId: null
+        };
+
+        // 必殺Lvの上限（凸数によって異なる）
+        const skilLevelCaps = {
+            0: 4, 1: 4, 2: 4,
+            3: 7, 4: 7,
+            5: 10
+        };
+
+        const dummySvg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"%3E%3Crect fill="%23999" width="96" height="96"/%3E%3C/svg%3E';
+
+        // ==================== 初期化 ====================
+        async function initialize() {
+            try {
+                await loadUnitList();
+                createSlots('ally', 'allySlots');
+                createSlots('enemy', 'enemySlots');
+                
+                // ローディング表示を非表示、メインコンテンツを表示
+                document.getElementById('loadingStatus').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showError('キオクデータ読み込み失敗: ' + error.message);
+            }
+        }
+
+        // エラー表示
+        function showError(message) {
+            const errorDiv = document.getElementById('errorStatus');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('loadingStatus').style.display = 'none';
+        }
+
+        // UnitListをJSから読み込む
+        async function loadUnitList() {
+            // グローバル変数にjs側で定義したデータを代入
+            UnitList = ImportedUnitList;
+
+            UnitList.forEach(unit => {
+                unitDetailsData[unit.id] = {
+                    unitId: unit.id,
+                    ascension: 5,
+                    level: 140,
+                    heartLevel: 50,
+                    magicRelease: 130,
+                    skillLevel: 10
+                };
+            });
+                
+            console.log(`Loaded ${UnitList.length} units successfully`);
+        }
+
+        // スロットを生成
+        function createSlots(team, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            for (let i = 0; i < 5; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'unit-slot';
+                slot.dataset.team = team;
+                slot.dataset.index = i;
+                slot.onclick = () => openUnitModal(team, i);
+                
+                const slotNumber = document.createElement('div');
+                slotNumber.className = 'slot-number';
+                slotNumber.textContent = i + 1;
+                
+                const slotContent = document.createElement('div');
+                slotContent.className = 'slot-content';
+                
+                // ユニット画像
+                const unitImage = document.createElement('img');
+                unitImage.className = 'unit-thumbnail empty';
+                unitImage.src = dummySvg;
+                unitImage.alt = '';
+                
+                // ユニット名
+                const unitName = document.createElement('div');
+                unitName.className = 'unit-name empty';
+                unitName.textContent = '未選択';
+                
+                const unitImageNameContainer = document.createElement('div');
+                unitImageNameContainer.className = 'unit-image-name';
+                unitImageNameContainer.appendChild(unitImage);
+                
+                const unitInfo = document.createElement('div');
+                unitInfo.className = 'unit-info';
+                unitInfo.appendChild(unitName);
+                
+                const unitStats = document.createElement('div');
+                unitStats.className = 'unit-stats';
+                unitStats.dataset.statsLabel = `${team}-${i}`;
+                
+                unitInfo.appendChild(unitStats);
+                unitImageNameContainer.appendChild(unitInfo);
+                
+                const clearBtn = document.createElement('button');
+                clearBtn.className = 'clear-btn';
+                clearBtn.textContent = 'Clear';
+                clearBtn.disabled = true;
+                clearBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    clearUnit(team, i);
+                };
+                
+                slotContent.appendChild(unitImageNameContainer);
+                slotContent.appendChild(clearBtn);
+                slot.appendChild(slotNumber);
+                slotContent.appendChild(clearBtn);
+                slot.appendChild(slotNumber);
+                slot.appendChild(slotContent);
+                container.appendChild(slot);
+            }
+        }
+
+        // ==================== モーダル操作 ====================
+        function openUnitModal(team, slotIndex) {
+            currentModal.team = team;
+            currentModal.slotIndex = slotIndex;
+            currentModal.selectedUnitId = teamState[team][slotIndex];
+            
+            // モーダルタイトルを更新
+            const teamLabel = team === 'ally' ? 'Ally' : 'Enemy';
+            document.getElementById('modalTitle').textContent = 
+                `${teamLabel} Slot ${slotIndex + 1} - キオク選択`;
+            
+            // ユニット一覧を生成
+            createUnitListInModal();
+            
+            // パラメータ欄を初期化
+            if (currentModal.selectedUnitId) {
+                updateParamSection(currentModal.selectedUnitId);
+            } else {
+                clearParamSection();
+            }
+            
+            document.getElementById('unitModal').classList.add('active');
+        }
+
+        // モーダルを閉じる
+        function closeModal() {
+            currentModal = {
+                team: null,
+                slotIndex: null,
+                selectedUnitId: null
+            };
+            document.getElementById('unitModal').classList.remove('active');
+        }
+
+        function createUnitListInModal() {
+            const listSection = document.getElementById('unitListSection');
+            listSection.innerHTML = '';
+            
+            UnitList.forEach(unit => {
+                const option = document.createElement('div');
+                option.className = 'unit-option';
+                if (unit.id === currentModal.selectedUnitId) {
+                    option.classList.add('selected');
+                }
+                option.dataset.unitId = unit.id;
+                
+                const img = document.createElement('img');
+                img.className = 'unit-option-image';
+                img.src = unit.image;
+                img.alt = unit.name;
+                img.onerror = function() { 
+                    this.src = dummySvg; 
+                };
+                
+                const name = document.createElement('div');
+                name.className = 'unit-option-name';
+                name.textContent = unit.name;
+                
+                option.appendChild(img);
+                option.appendChild(name);
+                option.onclick = () => selectUnit(unit.id);
+                
+                listSection.appendChild(option);
+            });
+        }
+
+        function selectUnit(unitId) {
+            currentModal.selectedUnitId = unitId;
+            
+            // 選択状態を更新
+            document.querySelectorAll('.unit-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            const selectedElement = document.querySelector(`[data-unit-id="${unitId}"]`);
+            if (selectedElement) {
+                selectedElement.classList.add('selected');
+            }
+            
+            // パラメータセクションを更新
+            updateParamSection(unitId);
+            
+            // 確定ボタンを有効化
+            document.getElementById('confirmBtn').disabled = false;
+        }
+
+        // ==================== パラメータセクション ====================
+        function updateParamSection(unitId) {
+            const paramsSection = document.getElementById('unitParamsSection');
+            const details = unitDetailsData[unitId];
+            
+            paramsSection.innerHTML = `
+                <h4>Kioku Parameters</h4>
+                
+                <div class="param-group">
+                    <label class="param-label">限界突破 (Ascension)</label>
+                    <p class="param-sublabel">0-5</p>
+                    <input type="number" class="param-input" id="paramascension" 
+                        min="0" max="5" value="${details.ascension}"
+                        onchange="updateascension(this.value)">
+                </div>
+                
+                <div class="param-group">
+                    <label class="param-label">レベル (Lvl)</label>
+                    <p class="param-sublabel">0-140</p>
+                    <input type="number" class="param-input" id="paramLevel" 
+                        min="0" max="140" value="${details.level}"
+                        onchange="updateDetails('level', this.value)">
+                </div>
+                
+                <div class="param-group">
+                    <label class="param-label">こころの器 (Heartphial)</label>
+                    <p class="param-sublabel">1-50</p>
+                    <input type="number" class="param-input" id="paramHeartLevel" 
+                        min="1" max="50" value="${details.heartLevel}"
+                        onchange="updateDetails('heartLevel', this.value)">
+                </div>
+                
+                <div class="param-group">
+                    <label class="param-label">魔力解放 (Magic Lvl)</label>
+                    <p class="param-sublabel">0-130</p>
+                    <input type="number" class="param-input" id="paramMagicRelease" 
+                        min="0" max="130" value="${details.magicRelease}"
+                        onchange="updateDetails('magicRelease', this.value)">
+                </div>
+                
+                <div class="param-group">
+                    <label class="param-label">必殺レベル (Special Lvl)</label>
+                    <p class="param-sublabel" id="skillLevelRange">1-4</p>
+                    <input type="number" class="param-input" id="paramSkillLevel" 
+                        min="1" value="${details.skillLevel}"
+                        onchange="updateSkillLevel(this.value)">
+                </div>
+            `;
+            
+            // 凸数に応じてスキルレベルの上限を更新
+            updateSkillLevelCap(details.ascension);
+        }
+
+        function clearParamSection() {
+            const paramsSection = document.getElementById('unitParamsSection');
+            paramsSection.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">キオクを選択してパラメータを編集</p>';
+            document.getElementById('confirmBtn').disabled = true;
+        }
+
+        function updateascension(value) {
+            value = Math.max(0, Math.min(5, parseInt(value) || 0));
+            unitDetailsData[currentModal.selectedUnitId].ascension = value;
+            document.getElementById('paramascension').value = value;
+            updateSkillLevelCap(value);
+        }
+
+        function updateSkillLevelCap(ascension) {
+            ascension = parseInt(ascension) || 0;
+            const cap = skilLevelCaps[ascension];
+            const rangeLabel = document.getElementById('skillLevelRange');
+            if (rangeLabel) {
+                rangeLabel.textContent = `1-${cap}`;
+            }
+            
+            const skillInput = document.getElementById('paramSkillLevel');
+            if (skillInput) {
+                skillInput.max = cap;
+                const currentValue = parseInt(skillInput.value) || 1;
+                if (currentValue > cap) {
+                    skillInput.value = cap;
+                    unitDetailsData[currentModal.selectedUnitId].skillLevel = cap;
+                }
+            }
+        }
+
+        function updateSkillLevel(value) {
+            value = parseInt(value) || 1;
+            const ascension = parseInt(document.getElementById('paramascension').value) || 0;
+            const cap = skilLevelCaps[ascension];
+            value = Math.max(1, Math.min(cap, value));
+            
+            unitDetailsData[currentModal.selectedUnitId].skillLevel = value;
+            document.getElementById('paramSkillLevel').value = value;
+        }
+
+        function updateDetails(key, value) {
+            let parsed = parseInt(value) || 0;
+            
+            if (key === 'level') {
+                parsed = Math.max(0, Math.min(140, parsed));
+                const input = document.getElementById('paramLevel');
+                if (input) input.value = parsed;
+            } else if (key === 'heartLevel') {
+                parsed = Math.max(1, Math.min(50, parsed));
+                const input = document.getElementById('paramHeartLevel');
+                if (input) input.value = parsed;
+            } else if (key === 'magicRelease') {
+                parsed = Math.max(0, Math.min(130, parsed));
+                const input = document.getElementById('paramMagicRelease');
+                if (input) input.value = parsed;
+            }
+            
+            unitDetailsData[currentModal.selectedUnitId][key] = parsed;
+        }
+
+        // ==================== 配置・スロット交換ロジック ====================
+        function assignUnitWithSwap(team, targetIndex, nextUnitId) {
+            const currentUnitId = teamState[team][targetIndex];
+            
+            // 同一チーム内で、すでに同じIDが選択されている別スロットを検索 (自身は除く)
+            const duplicateIndex = nextUnitId 
+                ? teamState[team].findIndex((id, idx) => id === nextUnitId && idx !== targetIndex) 
+                : -1;
+            
+            if (duplicateIndex !== -1) {
+                // 重複が存在する場合はスロットの状態を交換
+                teamState[team][duplicateIndex] = currentUnitId;
+                teamState[team][targetIndex] = nextUnitId;
+                
+                updateSlotDisplay(team, duplicateIndex);
+                updateSlotDisplay(team, targetIndex);
+            } else {
+                // 重複がない場合は通常配置
+                teamState[team][targetIndex] = nextUnitId;
+                updateSlotDisplay(team, targetIndex);
+            }
+        }
+
+        // ==================== 確定 ====================
+        function confirmUnitSelection() {
+            if (currentModal.selectedUnitId) {
+                // Confirmクリック時の即時バリデーション強制適用
+                const levelInput = document.getElementById('paramLevel');
+                const heartInput = document.getElementById('paramHeartLevel');
+                const magicInput = document.getElementById('paramMagicRelease');
+                
+                if (levelInput) updateDetails('level', levelInput.value);
+                if (heartInput) updateDetails('heartLevel', heartInput.value);
+                if (magicInput) updateDetails('magicRelease', magicInput.value);
+
+                const team = currentModal.team;
+                const index = currentModal.slotIndex;
+                
+                // 交換ロジック付きの配置関数を適用
+                assignUnitWithSwap(team, index, currentModal.selectedUnitId);
+                
+                closeModal();
+            }
+        }
+
+        // ==================== スロット表示更新 ====================
+        function updateSlotDisplay(team, slotIndex) {
+            const unitId = teamState[team][slotIndex];
+            
+            if (unitId) {
+                const unit = UnitList.find(u => u.id === unitId);
+                const details = unitDetailsData[unitId];
+                
+                // スロット内の画像とテキストを更新
+                const slot = document.querySelector(`[data-team="${team}"][data-index="${slotIndex}"]`);
+                const img = slot.querySelector('.unit-thumbnail');
+                const nameEl = slot.querySelector('.unit-name');
+                const statsEl = slot.querySelector('.unit-stats');
+                const clearBtn = slot.querySelector('.clear-btn');
+                
+                img.src = unit.image;
+                img.classList.remove('empty');
+                img.onerror = function() { 
+                    this.src = dummySvg; 
+                };
+                
+                nameEl.textContent = unit.name;
+                nameEl.classList.remove('empty');
+                
+                statsEl.innerHTML = `
+                    <div class="unit-stat">
+                        <span class="unit-stat-label">Lv:</span>
+                        <span>${details.level}</span>
+                    </div>
+                    <div class="unit-stat">
+                        <span class="unit-stat-label">凸:</span>
+                        <span>${details.ascension}</span>
+                    </div>
+                    <div class="unit-stat">
+                        <span class="unit-stat-label">こころの器:</span>
+                        <span>${details.heartLevel}</span>
+                    </div>
+                    <div class="unit-stat">
+                        <span class="unit-stat-label">必殺Lv:</span>
+                        <span>${details.skillLevel}</span>
+                    </div>
+                `;
+                
+                clearBtn.disabled = false;
+            } else {
+                const slot = document.querySelector(`[data-team="${team}"][data-index="${slotIndex}"]`);
+                const img = slot.querySelector('.unit-thumbnail');
+                const nameEl = slot.querySelector('.unit-name');
+                const statsEl = slot.querySelector('.unit-stats');
+                const clearBtn = slot.querySelector('.clear-btn');
+                
+                img.src = dummySvg;
+                img.classList.add('empty');
+                
+                nameEl.textContent = '未選択';
+                nameEl.classList.add('empty');
+                
+                statsEl.innerHTML = '';
+                
+                clearBtn.disabled = true;
+            }
+        }
+
+        function clearUnit(team, slotIndex) {
+            teamState[team][slotIndex] = null;
+            updateSlotDisplay(team, slotIndex);
+        }
+
+        // ==================== 検証・リセット ====================
+        function validateTeams() {
+            const allyFilled = teamState.ally.filter(u => u !== null).length;
+            const enemyFilled = teamState.enemy.filter(u => u !== null).length;
+            
+            if (allyFilled === 0 || enemyFilled === 0) {
+                showValidationMessage('味方と敵の両チームに最低1体以上のキオクが必要です', 'error');
+                return false;
+            }
+            
+            showValidationMessage('チーム編成は有効です！', 'success');
+            return true;
+        }
+
+        function showValidationMessage(message, type) {
+            const msgEl = document.getElementById('validationMessage');
+            msgEl.textContent = message;
+            msgEl.className = `validation-message ${type}`;
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    msgEl.className = 'validation-message';
+                }, 3000);
+            }
+        }
+
+        function resetAllTeams() {
+            teamState.ally = [null, null, null, null, null];
+            teamState.enemy = [null, null, null, null, null];
+            
+            createSlots('ally', 'allySlots');
+            createSlots('enemy', 'enemySlots');
+            document.getElementById('validationMessage').className = 'validation-message';
+        }
+
+		function startSimulation() {
+			if (validateTeams()) {
+				console.log('=== Simulation Start ===');
+				
+				document.getElementById('formation-screen').style.display = 'none';
+				document.getElementById('simulation-screen').style.display = 'block';
+				
+				// 状態のリセット
+				historySequence = [];
+				historyIndex = -1;
+				showDecimal = false; 
+				
+				const btn = document.getElementById('btnToggleDecimal');
+				if (btn) {
+					btn.textContent = "小数表示: OFF";
+					btn.style.backgroundColor = `#f1f5f9`;
+					btn.style.borderColor = `#cbd5e1`;
+					btn.style.color = `inherit`;
+				}
+				
+				onBattleStart();
+				renderSimulationScreen();
+				
+				// 各種イベントリスナーの登録（重複防止のため一度削除してから登録）
+				window.removeEventListener('keydown', handleKeyDown);
+				window.addEventListener('keydown', handleKeyDown);
+				
+				window.removeEventListener('resize', adjustSimulationScale);
+				window.addEventListener('resize', adjustSimulationScale);
+				
+				// 描画完了後に縮小処理を確実に適用するため、僅かなディレイを入れて実行
+				setTimeout(adjustSimulationScale, 50);
+			}
+		}
+		
+		// ==================== バトルの状態管理データ構造 ====================
+		let battleState = {
+			currentTime: 0, // 累積時刻 t
+			timeline: [],    // タイムライン（行動予定ユニットを格納する配列）
+			currentActor: null,     // 現在行動中のユニットオブジェクト
+			selectedTarget: null    // 選択されたターゲット情報 { team, slotIndex, id, tp }
+		};
+		
+		/**
+		 * 小数表示のON/OFFを切り替える関数
+		 */
+		function toggleDecimalDisplay() {
+			showDecimal = !showDecimal;
+			const btn = document.getElementById('btnToggleDecimal');
+			if (btn) {
+				btn.textContent = `小数表示: ${showDecimal ? 'ON' : 'OFF'}`;
+				if (showDecimal) {
+					// ON時の視覚的強調
+					btn.style.backgroundColor = `#e0e7ff`;
+					btn.style.borderColor = `#6366f1`;
+					btn.style.color = `#4f46e5`;
+				} else {
+					// OFF時の標準スタイル
+					btn.style.backgroundColor = `#f1f5f9`;
+					btn.style.borderColor = `#cbd5e1`;
+					btn.style.color = `inherit`;
+				}
+			}
+			// タイムラインの表示を即座に更新
+			renderSimulationScreen();
+		}
+
+		/**
+		 * ウィンドウの横幅に応じてレイアウト全体を枠内に収める縮小関数
+		 */
+		function adjustSimulationScale() {
+			const simLayout = document.querySelector('.sim-layout');
+			if (!simLayout) return;
+			
+			const wrapper = simLayout.parentElement;
+			if (!wrapper) return;
+			
+			// シミュレーターのコンテナ群が横並びを維持するために必要な基準最小横幅
+			// (行動表・TL・編成の各幅の合計。環境に合わせて数値を固定)
+			const baseWidth = 960; 
+			const currentWrapperWidth = wrapper.clientWidth;
+			
+			if (currentWrapperWidth < baseWidth) {
+				// 横幅が不足している場合、はみ出さない比率を計算して縮小(scale)を適用
+				const scale = currentWrapperWidth / baseWidth;
+				simLayout.style.transform = `scale(${scale})`;
+				simLayout.style.transformOrigin = 'top left';
+				simLayout.style.width = `${baseWidth}px`;
+				
+				// scale適用によって下部に生じる不要な余白、または高さの潰れを補正
+				wrapper.style.height = `${simLayout.offsetHeight * scale}px`;
+			} else {
+				// 十分な横幅がある場合は等倍(100%)に戻す
+				simLayout.style.transform = 'none';
+				simLayout.style.transformOrigin = 'initial';
+				simLayout.style.width = 'auto';
+				wrapper.style.height = 'auto';
+			}
+		}
+		
+		/**
+		 * 履歴シーケンスの構造
+		 * historySequence[i] には、i番目の行動が「確定して進む直前」の完全なバトル状態が入る
+		 */
+		let historySequence = []; 
+		let historyIndex = -1; // 現在表示している手番のインデックス（-1 は開始直後の初期状態）
+
+		/**
+		* タイムラインのソート関数（常時適用）
+		* 第1ソートキー: 行動値 (av) の昇順
+		* 第2ソートキー: ターン優先度 (tp) の昇順
+		*/
+		function sortTimeline() {
+			battleState.timeline.sort((a, b) => {
+				// 1. まず非負実数である行動値(av)で比較
+				if (a.av !== b.av) {
+					return a.av - b.av;
+				}
+				// 2. 行動値(av)が完全に等しい場合、ターン優先度(tp)で比較（値が小さいものが前）
+				return a.tp - b.tp;
+			});
+		}
+		
+		/**
+		 * 左右キーの代替操作
+		 */
+		function handleKeyDown(e) {
+			// シミュレーション画面が表示されていない場合は無視
+			if (document.getElementById('simulation-screen').style.display === 'none') return;
+			
+			if (e.key === 'ArrowLeft') {
+				backupTurn();
+			} else if (e.key === 'ArrowRight') {
+				proceedTurnUI();
+			}
+		}
+		
+		/**
+		 * バトル開始時 (onBattleStart) の処理関数
+		 * 初期AV設定後、直ちに最初の「minAV減算とActor決定」を行う。
+		 */
+		function onBattleStart() {
+			battleState.currentTime = 0;
+			battleState.timeline = [];
+			battleState.currentActor = null;
+			battleState.selectedTarget = null;
+
+			// 敵チームの処理
+			for (let i = 0; i < teamState.enemy.length; i++) {
+				const unitId = teamState.enemy[i];
+				if (unitId !== null) {
+					const unitBase = ImportedUnitList.find(u => u.id === unitId);
+					if (unitBase) {
+						battleState.timeline.push({
+							id: unitId,
+							name: unitBase.name,
+							team: 'enemy',
+							slotIndex: i,
+							tp: i + 1,
+							spd: unitBase.spd,
+							av: 10000 / unitBase.spd // 初期値設定
+						});
+					}
+				}
+			}
+
+			// 味方チームの処理
+			for (let i = 0; i < teamState.ally.length; i++) {
+				const unitId = teamState.ally[i];
+				if (unitId !== null) {
+					const unitBase = ImportedUnitList.find(u => u.id === unitId);
+					if (unitBase) {
+						battleState.timeline.push({
+							id: unitId,
+							name: unitBase.name,
+							team: 'ally',
+							slotIndex: i,
+							tp: i + 6,
+							spd: unitBase.spd,
+							av: 10000 / unitBase.spd // 初期値設定
+						});
+					}
+				}
+			}
+
+			// 初期ソートを実行
+			sortTimeline();
+
+			// 最初のActorの決定と、t=0から最初の行動時刻までの時間進行（minAV減算）を即座に実行
+			if (battleState.timeline.length > 0) {
+				const minAV = battleState.timeline[0].av;
+				battleState.currentTime += minAV;
+				battleState.timeline.forEach(node => {
+					node.av -= minAV;
+				});
+				// 減算により残りAVが0になった先頭のユニットが、このターンの「現在のActor」となる
+				battleState.currentActor = battleState.timeline[0];
+			}
+		}
+		
+		/**
+		 * 編成画面に戻るための関数
+		 */
+		function returnToFormation() {
+			window.removeEventListener('keydown', handleKeyDown);
+			window.removeEventListener('resize', adjustSimulationScale);
+			document.getElementById('simulation-screen').style.display = 'none';
+			document.getElementById('formation-screen').style.display = 'block';
+		}
+
+		/**
+		 * ターゲット選択処理関数
+		 * 対象を選択した瞬間に、ActorのAV更新とTL上の位置移動を画面表示に反映させる
+		 */
+		function selectTarget(team, slotIndex, id, tp) {
+			if (!battleState.currentActor) return;
+			if (id === null) return; // 空スロットは選択不可
+
+			// 相対フラグのチェック：Actorの所属チームと同じであればFriendであるため処理を拒否
+			if (battleState.currentActor.team === team) {
+				return; 
+			}
+
+			// Opponentである場合の選択・解除ロジック
+			if (battleState.selectedTarget && 
+				battleState.selectedTarget.team === team && 
+				battleState.selectedTarget.slotIndex === slotIndex) {
+				// すでに選択されているスロットを再度クリックした場合は解除
+				battleState.selectedTarget = null;
+			} else {
+				// 新規ターゲットの登録
+				battleState.selectedTarget = {
+					team: team,
+					slotIndex: slotIndex,
+					id: id,
+					tp: tp
+				};
+			}
+
+			// ターゲット選択状態が変わったため、再描画（TLの先行更新表示が行われる）
+			renderSimulationScreen();
+		}
+
+		/**
+		 * 特定のインデックスの履歴からバトル状態を復元する内部関数
+		 * 引数に autoSelectNext を追加し、ジャンプ時に次の行動を自動選択状態にする
+		 */
+		function restoreStateFromSequence(index, autoSelectNext = false) {
+			if (index === -1) {
+				onBattleStart();
+				return;
+			}
+			
+			// 指定されたインデックスのスナップショットをディープコピーして復元
+			const snapshot = JSON.parse(JSON.stringify(historySequence[index]));
+			battleState = snapshot;
+			
+			// 1. 内部データとしてActorのAVを更新（10000 / spd を加算）
+			const actor = battleState.timeline.find(node => 
+				node.team === battleState.currentActor.team && 
+				node.slotIndex === battleState.currentActor.slotIndex
+			);
+			if (actor) {
+				actor.av = 10000 / actor.spd;
+			}
+			
+			// 2. タイムラインを確定ソート
+			sortTimeline();
+			
+			// 3. 次のターンのActor決定と時間進行（minAV減算）
+			if (battleState.timeline.length > 0) {
+				const minAV = battleState.timeline[0].av;
+				battleState.currentTime += minAV;
+				battleState.timeline.forEach(node => {
+					node.av -= minAV;
+				});
+				battleState.currentActor = battleState.timeline[0];
+			}
+
+			// 4. 【要件1】ジャンプ時に「次の行動履歴」があればそれを参照して選択状態にする
+			if (autoSelectNext && index + 1 < historySequence.length) {
+				const nextHistory = historySequence[index + 1];
+				if (nextHistory && nextHistory.selectedTarget) {
+					// 次の履歴に記録されているターゲット情報をそのまま復元（ディープコピー）
+					battleState.selectedTarget = JSON.parse(JSON.stringify(nextHistory.selectedTarget));
+				} else {
+					battleState.selectedTarget = null;
+				}
+			} else {
+				battleState.selectedTarget = null;
+			}
+		}
+
+		/**
+		 * 行動表の特定の行をクリックしたときの処理
+		 */
+		function jumpToHistoryStep(index) {
+			historyIndex = index;
+			// 第2引数を true にして、復元と同時に「次の一手」を自動選択させる
+			restoreStateFromSequence(index, true);
+			renderSimulationScreen();
+		}
+
+		/**
+		 * 戻るボタン：1つ前の行動へ戻す（バックアップ時も次の行動を自動選択させる）
+		 */
+		function backupTurn() {
+			if (historyIndex < 0) return; // 開始状態より前には戻れない
+
+			if (historyIndex === 0) {
+				historyIndex = -1;
+				onBattleStart();
+				// 初期状態（-1）に戻る場合、配列の0番目に存在する行動を「次の一手」として自動選択する
+				if (historySequence.length > 0 && historySequence[0].selectedTarget) {
+					battleState.selectedTarget = JSON.parse(JSON.stringify(historySequence[0].selectedTarget));
+				}
+			} else {
+				historyIndex--;
+				restoreStateFromSequence(historyIndex, true);
+			}
+			renderSimulationScreen();
+		}
+
+		/**
+		 * 進むボタン：選択されたターゲットを確定し、ログを進める
+		 * 【修正】既存の次の行動と選択が一致していれば、以降のログを消さない
+		 */
+		function proceedTurnUI() {
+			if (!battleState.currentActor) return;
+
+			// ターゲットが未選択（null）の場合は進行不可
+			if (!battleState.selectedTarget) {
+				return;
+			}
+
+			let useExistingHistory = false;
+
+			// もし現在地が過去であり、かつ「次の行動履歴」が存在する場合
+			if (historyIndex + 1 < historySequence.length) {
+				const nextHistory = historySequence[historyIndex + 1];
+				
+				// 【要件1】現在選択しているターゲットが、次の履歴のターゲットと一致しているか厳密に比較
+				if (nextHistory && nextHistory.selectedTarget &&
+					nextHistory.selectedTarget.team === battleState.selectedTarget.team &&
+					nextHistory.selectedTarget.slotIndex === battleState.selectedTarget.slotIndex) {
+					
+					// 一致しているため、以降のログを消さずにポインタを1つ進めるフラグを立てる
+					useExistingHistory = true;
+				}
+			}
+
+			if (useExistingHistory) {
+				// 既存の履歴と同じ行動をとったため、ログの破棄・新規追加はせずポインタの更新と復元のみ行う
+				historyIndex++;
+				restoreStateFromSequence(historyIndex, true);
+			} else {
+				// 異なる対象を選び直した（または最先端からの新規行動である）ため、
+				// ポインタ以降の未来の履歴を切り捨て、現在の状態を新しく記録する
+				if (historyIndex < historySequence.length - 1) {
+					historySequence = historySequence.slice(0, historyIndex + 1);
+				}
+
+				historySequence.push(JSON.parse(JSON.stringify(battleState)));
+				historyIndex++;
+
+				// 1. 内部データとしてActorのAVを更新
+				const actor = battleState.timeline.find(node => 
+					node.team === battleState.currentActor.team && 
+					node.slotIndex === battleState.currentActor.slotIndex
+				);
+				if (actor) {
+					actor.av = 10000 / actor.spd;
+				}
+
+				// 2. タイムラインを確定ソート
+				sortTimeline();
+
+				// 3. 次のターンのActor決定と時間進行（minAV減算）
+				if (battleState.timeline.length > 0) {
+					const minAV = battleState.timeline[0].av;
+					battleState.currentTime += minAV;
+					battleState.timeline.forEach(node => {
+						node.av -= minAV;
+					});
+					battleState.currentActor = battleState.timeline[0];
+				}
+
+				// 4. 次のターンのターゲットを初期化（ただし、ここでも「さらに次の履歴」があれば自動選択）
+				if (historyIndex + 1 < historySequence.length) {
+					const nextNextHistory = historySequence[historyIndex + 1];
+					if (nextNextHistory && nextNextHistory.selectedTarget) {
+						battleState.selectedTarget = JSON.parse(JSON.stringify(nextNextHistory.selectedTarget));
+					} else {
+						battleState.selectedTarget = null;
+					}
+				} else {
+					battleState.selectedTarget = null;
+				}
+			}
+
+			// 5. 画面更新
+			renderSimulationScreen();
+		}
+
+		/**
+		 * 最初に戻るボタン
+		 */
+		function resetToStart() {
+			historyIndex = -1;
+			onBattleStart();
+			// 初期状態に戻った際も、1手目の行動（配列の0番目）があれば自動選択状態にする
+			if (historySequence.length > 0 && historySequence[0].selectedTarget) {
+				battleState.selectedTarget = JSON.parse(JSON.stringify(historySequence[0].selectedTarget));
+			}
+			renderSimulationScreen();
+		}
+
+		/**
+		 * 画面描画関数の修正（行動表の表示ロジック、および進むボタンの無効化処理を追加）
+		 */
+		function renderSimulationScreen() {
+			const currentActor = battleState.currentActor;
+
+			// ==================== 行動表（Action Log）の描画 ====================
+			const actionLogEl = document.getElementById('simActionLog');
+			actionLogEl.innerHTML = '';
+
+			let activeItemEl = null;
+
+			// 【要件1】初期状態を表す不変の項目 "0. Battle Start" を先頭に固定配置
+			const startLogItem = document.createElement('div');
+			startLogItem.className = 'action-log-item';
+			startLogItem.textContent = "0. Battle Start";
+			
+			// 初期状態（historyIndex が -1）のときはこの行をアクティブ（青枠）にする
+			if (historyIndex === -1) {
+				startLogItem.classList.add('current-step');
+				activeItemEl = startLogItem;
+			}
+			// クリックされたら初期状態（-1）へジャンプ
+			startLogItem.onclick = () => jumpToHistoryStep(-1);
+			actionLogEl.appendChild(startLogItem);
+
+			// 確定済みの行動履歴を順番に描画（従来通りのループ処理）
+			historySequence.forEach((state, idx) => {
+				const logItem = document.createElement('div');
+				logItem.className = 'action-log-item';
+				if (idx === historyIndex) {
+					logItem.classList.add('current-step');
+					activeItemEl = logItem;
+				}
+
+				const actorName = state.currentActor ? state.currentActor.name : 'Unknown';
+				const targetName = state.selectedTarget ? state.selectedTarget.id : 'None'; 
+				const targetUnit = ImportedUnitList.find(u => u.id === targetName);
+				const targetFullName = targetUnit ? targetUnit.name : 'Unknown';
+
+				logItem.textContent = `${idx + 1}. ${actorName} → ${targetFullName}, BA`;
+				logItem.onclick = () => jumpToHistoryStep(idx);
+				actionLogEl.appendChild(logItem);
+			});
+
+			// アクティブな行への自動スクロール追従
+			if (activeItemEl) {
+				activeItemEl.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+			} else if (historyIndex === -1) {
+				actionLogEl.scrollTop = 0;
+			}
+
+
+			// ==================== タイムラインの先行更新配列の作成 ====================
+			let displayTimeline = battleState.timeline.map(node => ({ ...node }));
+			if (battleState.selectedTarget && currentActor) {
+				const actorNode = displayTimeline.find(node => 
+					node.team === currentActor.team && 
+					node.slotIndex === currentActor.slotIndex
+				);
+				if (actorNode) {
+					actorNode.av = 10000 / actorNode.spd;
+				}
+				displayTimeline.sort((a, b) => {
+					if (a.av !== b.av) return a.av - b.av;
+					return a.tp - b.tp;
+				});
+			}
+
+			// 1. 左側タイムライン（TL）の描画
+			const timelineEl = document.getElementById('simTimeline');
+			timelineEl.innerHTML = '';
+			displayTimeline.forEach(node => {
+				const item = document.createElement('div');
+				item.className = 'timeline-item';
+				const unitBase = ImportedUnitList.find(u => u.id === node.id);
+				const imgSrc = unitBase ? unitBase.image : '';
+
+				// 小数第6位までを厳密に計算（7位以下切り捨て処理）
+				const truncatedAv = Math.floor(node.av * 1000000) / 1000000;
+				
+				// 【要件3】フラグの状態によって、整数表示か小数第6位表示かを切り分ける
+				const avDisplayString = showDecimal ? truncatedAv.toFixed(6) : Math.floor(node.av).toString();
+
+				item.innerHTML = `
+					<img src="${imgSrc}" alt="${node.name}" class="timeline-icon">
+					<span class="timeline-av">${avDisplayString}</span>
+				`;
+				timelineEl.appendChild(item);
+			});
+
+			// 2. 右側敵チームの描画
+			const enemyRowEl = document.getElementById('simEnemyTeam');
+			enemyRowEl.innerHTML = '';
+			for (let i = 0; i < 5; i++) {
+				const unitId = teamState.enemy[i];
+				const slot = document.createElement('div');
+				slot.className = 'sim-slot';
+				const tp = i + 1;
+
+				if (currentActor && currentActor.team === 'enemy' && currentActor.slotIndex === i) {
+					slot.classList.add('actor-highlight');
+				}
+				if (battleState.selectedTarget && battleState.selectedTarget.team === 'enemy' && battleState.selectedTarget.slotIndex === i) {
+					slot.classList.add('target-highlight');
+				}
+				if (unitId !== null && currentActor && currentActor.team === 'ally') {
+					slot.classList.add('selectable-opponent');
+				}
+				slot.onclick = () => selectTarget('enemy', i, unitId, tp);
+
+				if (unitId !== null) {
+					const unitBase = ImportedUnitList.find(u => u.id === unitId);
+					if (unitBase) {
+						slot.innerHTML += `<img src="${unitBase.image}" alt="${unitBase.name}" class="sim-unit-img"><span class="sim-slot-tp">TP ${tp}</span>`;
+					}
+				} else {
+					slot.innerHTML += `<span class="sim-slot-tp">TP ${tp}</span>`;
+				}
+				enemyRowEl.appendChild(slot);
+			}
+
+			// 3. 右側味方チームの描画
+			const allyRowEl = document.getElementById('simAllyTeam');
+			allyRowEl.innerHTML = '';
+			for (let i = 0; i < 5; i++) {
+				const unitId = teamState.ally[i];
+				const slot = document.createElement('div');
+				slot.className = 'sim-slot';
+				const tp = i + 6;
+
+				if (currentActor && currentActor.team === 'ally' && currentActor.slotIndex === i) {
+					slot.classList.add('actor-highlight');
+				}
+				if (battleState.selectedTarget && battleState.selectedTarget.team === 'ally' && battleState.selectedTarget.slotIndex === i) {
+					slot.classList.add('target-highlight');
+				}
+				if (unitId !== null && currentActor && currentActor.team === 'enemy') {
+					slot.classList.add('selectable-opponent');
+				}
+				slot.onclick = () => selectTarget('ally', i, unitId, tp);
+
+				if (unitId !== null) {
+					const unitBase = ImportedUnitList.find(u => u.id === unitId);
+					if (unitBase) {
+						slot.innerHTML += `<img src="${unitBase.image}" alt="${unitBase.name}" class="sim-unit-img"><span class="sim-slot-tp">TP ${tp}</span>`;
+					}
+				} else {
+					slot.innerHTML += `<span class="sim-slot-tp">TP ${tp}</span>`;
+				}
+				allyRowEl.appendChild(slot);
+			}
+
+			// ボタンの活性・非活性制御
+			document.getElementById('btnBackup').disabled = (historyIndex < 0);
+			document.getElementById('btnReset').disabled = (historyIndex < 0);
+			document.getElementById('btnProceed').disabled = (!battleState.selectedTarget);
+		}
+
+        // ==================== ページロード時に初期化 ====================
+        window.onload = initialize;
+    </script>
+</body>
+</html>
