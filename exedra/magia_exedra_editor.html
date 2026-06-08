@@ -494,7 +494,8 @@
 		.sim-layout {
 			display: flex;
 			gap: 50px;
-			margin-top: 20px;
+			margin-top: 0;
+			padding-bottom: 20px;
 		}
 		
 		/* 小数表示切り替えボタンのスタイル */
@@ -521,6 +522,7 @@
 		.sim-layout-wrapper {
 			width: 100%;
 			overflow: hidden; /* スケール縮小時のはみ出しを防止 */
+			margin-top: 20px;
 		}
 
 		/* 左側：タイムライン領域 */
@@ -655,6 +657,12 @@
 			display: flex;
 			gap: 15px;
 		}
+		
+		/* 「編成に戻る」ボタンを少し小さくするための専用追加スタイル */
+		.sim-controls .btn-return-formation {
+			padding: 6px 16px !important;
+			font-size: 13px !important;
+		}
 
 		.sim-btn {
 			padding: 10px 24px;
@@ -709,7 +717,7 @@
 			margin-top: 15px;
 			height: 400px;           /* 高さを400pxに完全に固定 */
 			max-height: 400px;
-			overflow-y: auto;        /* 枠を超えたら自動で縦スクロールを表示 */
+			overflow: auto;        /* 枠を超えたら自動で縦・横スクロールを表示 */
 			border: 1px solid #cbd5e1;
 			border-radius: 6px;
 			padding: 6px;
@@ -725,12 +733,15 @@
 			background: #ffffff;
 			border: 1px solid #e2e8f0;
 			white-space: nowrap;
-			overflow: hidden;
-			text-overflow: ellipsis;
+			overflow: visible;
+			text-overflow: clip;
 			user-select: none;
 			
 			/* 要素が枠内で潰されるのを防ぐ */
-			flex-shrink: 0;          
+			flex-shrink: 0;
+
+			width: max-content;
+			min-width: 100%;
 		}
 
 		.action-log-item:hover {
@@ -757,7 +768,8 @@
 			display: block;
 		}
     </style>
-    <script src="unitlist.js"></script>
+    <script src="unitList.js"></script>
+	<script src="effectTable.js"></script>
 </head>
 <body>
 	<div id="formation-screen">
@@ -837,11 +849,18 @@
 							<div id="simAllyTeam" class="sim-team-row"></div>
 						</div>
 						
-						<div class="sim-controls">
-							<button id="btnReset" class="sim-btn btn-secondary" onclick="resetToStart()">最初に戻る</button>
-							<button id="btnBackup" class="sim-btn" onclick="backupTurn()">戻る (←)</button>
-							<button id="btnProceed" class="sim-btn" onclick="proceedTurnUI()">進む (→)</button>
-							<button class="sim-btn btn-secondary" onclick="returnToFormation()">編成に戻る</button>
+						<div class="sim-controls" style="display: flex; flex-direction: column; gap: 10px;">
+							<div style="display: flex; gap: 8px; width: 100%;">
+								<button id="btnReset" class="sim-btn btn-secondary" style="flex: 1;" onclick="resetToStart()">最初に戻る</button>
+								<button id="btnBackup" class="sim-btn" style="flex: 1;" onclick="backupTurn()">戻る (←)</button>
+								<button id="btnProceed" class="sim-btn" style="flex: 1;" onclick="proceedTurnUI()">進む (→)</button>
+								
+								<button id="btnToggleSkill" class="sim-btn" style="flex: 1; background-color: #f1f5f9; border: 1px solid #cbd5e1; color: #334155;" onclick="toggleSkillType()">スキル: BA</button>
+							</div>
+
+							<div style="width: 100%;">
+								<button class="sim-btn btn-secondary btn-return-formation" style="width: 100%; background-color: #64748b; color: white;" onclick="returnToFormationConfirm()">編成に戻る</button>
+							</div>
 						</div>
 					</div>
 
@@ -851,6 +870,7 @@
 	</div>
 
     <script>
+	
         // ==================== グローバル変数 ====================
         let UnitList = [];
 		let showDecimal = false; // 小数表示フラグ
@@ -873,7 +893,7 @@
         };
 
         // 必殺Lvの上限（凸数によって異なる）
-        const skilLevelCaps = {
+        const specialLevelCaps = {
             0: 4, 1: 4, 2: 4,
             3: 7, 4: 7,
             5: 10
@@ -926,9 +946,9 @@
                         unitId: null,
                         ascension: 5,
                         level: 140,
-                        heartLevel: 50,
-                        magicRelease: 130,
-                        skillLevel: 10
+                        heartphial: 50,
+                        magicLevel: 130,
+                        specialLevel: 10
                     };
                 }
             });
@@ -1116,29 +1136,29 @@
                     <label class="param-label">こころの器 (Heartphial)</label>
                     <p class="param-sublabel">1-50</p>
                     <input type="number" class="param-input" id="paramHeartLevel" 
-                        min="1" max="50" value="${details.heartLevel}"
-                        onchange="updateDetails('heartLevel', this.value)">
+                        min="1" max="50" value="${details.heartphial}"
+                        onchange="updateDetails('heartphial', this.value)">
                 </div>
                 
                 <div class="param-group">
                     <label class="param-label">魔力解放 (Magic Lvl)</label>
                     <p class="param-sublabel">0-130</p>
                     <input type="number" class="param-input" id="paramMagicRelease" 
-                        min="0" max="130" value="${details.magicRelease}"
-                        onchange="updateDetails('magicRelease', this.value)">
+                        min="0" max="130" value="${details.magicLevel}"
+                        onchange="updateDetails('magicLevel', this.value)">
                 </div>
                 
                 <div class="param-group">
                     <label class="param-label">必殺レベル (Special Lvl)</label>
-                    <p class="param-sublabel" id="skillLevelRange">1-4</p>
-                    <input type="number" class="param-input" id="paramSkillLevel" 
-                        min="1" value="${details.skillLevel}"
-                        onchange="updateSkillLevel(this.value)">
+                    <p class="param-sublabel" id="specialLevelRange">1-4</p>
+                    <input type="number" class="param-input" id="paramSpecialLevel" 
+                        min="1" value="${details.specialLevel}"
+                        onchange="updateSpecialLevel(this.value)">
                 </div>
             `;
             
             // 凸数に応じてスキルレベルの上限を更新
-            updateSkillLevelCap(details.ascension);
+            updateSpecialLevelCap(details.ascension);
         }
 
         function clearParamSection() {
@@ -1152,38 +1172,38 @@
             const slotKey = `${currentModal.team}-${currentModal.slotIndex}`;
             unitDetailsData[slotKey].ascension = value;
             document.getElementById('paramascension').value = value;
-            updateSkillLevelCap(value);
+            updateSpecialLevelCap(value);
         }
 
-        function updateSkillLevelCap(ascension) {
+        function updateSpecialLevelCap(ascension) {
             ascension = parseInt(ascension) || 0;
-            const cap = skilLevelCaps[ascension];
-            const rangeLabel = document.getElementById('skillLevelRange');
+            const cap = specialLevelCaps[ascension];
+            const rangeLabel = document.getElementById('specialLevelRange');
             if (rangeLabel) {
                 rangeLabel.textContent = `1-${cap}`;
             }
             
-            const skillInput = document.getElementById('paramSkillLevel');
+            const skillInput = document.getElementById('paramSpecialLevel');
             if (skillInput) {
                 skillInput.max = cap;
                 const currentValue = parseInt(skillInput.value) || 1;
                 if (currentValue > cap) {
                     skillInput.value = cap;
                     const slotKey = `${currentModal.team}-${currentModal.slotIndex}`;
-                    unitDetailsData[slotKey].skillLevel = cap;
+                    unitDetailsData[slotKey].specialLevel = cap;
                 }
             }
         }
 
-        function updateSkillLevel(value) {
+        function updateSpecialLevel(value) {
             value = parseInt(value) || 1;
             const ascension = parseInt(document.getElementById('paramascension').value) || 0;
-            const cap = skilLevelCaps[ascension];
+            const cap = specialLevelCaps[ascension];
             value = Math.max(1, Math.min(cap, value));
             
             const slotKey = `${currentModal.team}-${currentModal.slotIndex}`;
-            unitDetailsData[slotKey].skillLevel = value;
-            document.getElementById('paramSkillLevel').value = value;
+            unitDetailsData[slotKey].specialLevel = value;
+            document.getElementById('paramSpecialLevel').value = value;
         }
 
         function updateDetails(key, value) {
@@ -1193,11 +1213,11 @@
                 parsed = Math.max(0, Math.min(140, parsed));
                 const input = document.getElementById('paramLevel');
                 if (input) input.value = parsed;
-            } else if (key === 'heartLevel') {
+            } else if (key === 'heartphial') {
                 parsed = Math.max(1, Math.min(50, parsed));
                 const input = document.getElementById('paramHeartLevel');
                 if (input) input.value = parsed;
-            } else if (key === 'magicRelease') {
+            } else if (key === 'magicLevel') {
                 parsed = Math.max(0, Math.min(130, parsed));
                 const input = document.getElementById('paramMagicRelease');
                 if (input) input.value = parsed;
@@ -1250,8 +1270,8 @@
                 const magicInput = document.getElementById('paramMagicRelease');
                 
                 if (levelInput) updateDetails('level', levelInput.value);
-                if (heartInput) updateDetails('heartLevel', heartInput.value);
-                if (magicInput) updateDetails('magicRelease', magicInput.value);
+                if (heartInput) updateDetails('heartphial', heartInput.value);
+                if (magicInput) updateDetails('magicLevel', magicInput.value);
 
                 const team = currentModal.team;
                 const index = currentModal.slotIndex;
@@ -1303,11 +1323,11 @@
                     </div>
                     <div class="unit-stat">
                         <span class="unit-stat-label">こころの器:</span>
-                        <span>${details.heartLevel}</span>
+                        <span>${details.heartphial}</span>
                     </div>
                     <div class="unit-stat">
                         <span class="unit-stat-label">必殺Lv:</span>
-                        <span>${details.skillLevel}</span>
+                        <span>${details.specialLevel}</span>
                     </div>
                 `;
                 
@@ -1372,6 +1392,49 @@
             createSlots('enemy', 'enemySlots');
             document.getElementById('validationMessage').className = 'validation-message';
         }
+		
+		/**
+		 * スキルタイプ（BA/BS）をトグル切り替えする
+		 */
+		function toggleSkillType() {
+			if (!battleState.skillType) {
+				battleState.skillType = "BA";
+			}
+			
+			// BAとBSを反転
+			battleState.skillType = (battleState.skillType === "BA") ? "BS" : "BA";
+			
+			// UIボタンの表記とスタイルを更新
+			updateSkillButtonUI();
+			
+			// スキル種別変更に伴いタイムライン予測や画面の再描画を行う
+			renderSimulationScreen();
+		}
+
+		/**
+		 * スキルタイプボタンの視覚的状態を更新する内部関数
+		 */
+		function updateSkillButtonUI() {
+			const btn = document.getElementById('btnToggleSkill');
+			if (!btn) return;
+			
+			const currentType = battleState.skillType || "BA";
+			btn.textContent = `スキル: ${currentType}`;
+			
+			if (currentType === "BS") {
+				// BS選択時は紫ベースの強調カラーに変更
+				btn.style.backgroundColor = "#e0e7ff";
+				btn.style.borderColor = "#6366f1";
+				btn.style.color = "#4f46e5";
+				btn.style.fontWeight = "bold";
+			} else {
+				// BA選択時は青ベースの強調カラーに変更
+				btn.style.backgroundColor = "#e0f2fe";
+				btn.style.borderColor = "#3b82f6";
+				btn.style.color = "#2563eb";
+				btn.style.fontWeight = "bold";
+			}
+		}
 
 		function startSimulation() {
 			if (validateTeams()) {
@@ -1383,6 +1446,10 @@
 				historySequence = [];
 				historyIndex = -1;
 				showDecimal = false; 
+				
+				//初期スキルタイプをBAに設定する
+				battleState.skillType = "BA";
+				updateSkillButtonUI();
 				
 				const btn = document.getElementById('btnToggleDecimal');
 				if (btn) {
@@ -1410,7 +1477,7 @@
 		let battleState = {
 			currentTime: 0, // 累積時刻 t
 			timeline: [],    // タイムライン（行動予定ユニットを格納する配列）
-			currentActor: null,     // 現在行動中のユニットオブジェクト
+			actor: null,     // 現在行動中のユニットオブジェクト
 			selectedTarget: null    // 選択されたターゲット情報 { team, slotIndex, id, tp }
 		};
 		
@@ -1557,7 +1624,7 @@
 		function onBattleStart() {
 			battleState.currentTime = 0;
 			battleState.timeline = [];
-			battleState.currentActor = null;
+			battleState.actor = null;
 			battleState.selectedTarget = null;
 
 			// 敵チームの処理
@@ -1579,9 +1646,9 @@
 							// 編成画面で設定したパラメータをタイムラインノードに載せる
 							ascension: details.ascension,
 							level: details.level,
-							heartLevel: details.heartLevel,
-							magicRelease: details.magicRelease,
-							skillLevel: details.skillLevel
+							heartphial: details.heartphial,
+							magicLevel: details.magicLevel,
+							specialLevel: details.specialLevel
 						});
 					}
 				}
@@ -1606,9 +1673,9 @@
 							// 編成画面で設定したパラメータをタイムラインノードに載せる
 							ascension: details.ascension,
 							level: details.level,
-							heartLevel: details.heartLevel,
-							magicRelease: details.magicRelease,
-							skillLevel: details.skillLevel
+							heartphial: details.heartphial,
+							magicLevel: details.magicLevel,
+							specialLevel: details.specialLevel
 						});
 					}
 				}
@@ -1629,20 +1696,16 @@
 
 				// ability の処理
 				if (Array.isArray(unitData.ability)) {
-					unitData.ability
-						.filter(effect => effect.timing === "onBattleStart")
-						.forEach(effect => {
-							executeEffect(effect, u);
-						});
+					executeEffect(unitData.ability.filter(effect => effect.timing === "onBattleStart"), u);
 				}
 
 				// ascensionEffect の処理：そのユニットの凸数以下のエフェクトのみ適用
 				if (Array.isArray(unitData.ascensionEffect)) {
-					unitData.ascensionEffect
-						.filter(effect => effect.ascension <= currentAscension && effect.timing === "onBattleStart")
-						.forEach(effect => {
-							executeEffect(effect, u);
-						});
+					executeEffect(
+						unitData.ascensionEffect
+							.filter(effect => effect.ascension <= currentAscension && effect.timing === "onBattleStart")
+							.sort((a, b) => a.ascension - b.ascension)
+						, u);
 				}
 			});
 
@@ -1657,18 +1720,49 @@
 					node.av -= minAV;
 				});
 				// 減算により残りAVが0になった先頭のユニットが、このターンの「現在のActor」となる
-				battleState.currentActor = battleState.timeline[0];
+				battleState.actor = battleState.timeline[0];
 			}
 		}
 		
-		function executeEffect(effect, unitInfo) {
-			console.log(`[Effect Apply] TP:${unitInfo.tp} [${unitInfo.team} Slot:${unitInfo.slotIndex}] -> Type: ${effect.type}`);
-			// ここに具体的なステータス加算やフラグ付与のロジックを記述します
+		/**
+		 * 指定された効果リスト（配列）を上から順番に実行する関数
+		 * @param {Array} effectList - ActionList[id].effectLevel[level] で取得できる配列
+		 */
+		function executeEffect(effectList, unitId) {
+			// 厳密性の担保：引数が不正な場合や空の場合は処理しない
+			if (!Array.isArray(effectList)) {
+				console.error("エラー: effectListが配列ではありません。");
+				return;
+			}
+
+			// 配列の先頭（上）から順番に処理を実行
+			for (const effect of effectList) {
+				const { type, ...params } = effect; // type と それ以外のパラメータに分解
+
+				// 未定義の言葉（type）がないか厳密にチェック
+				if (typeof effectTable[type] === 'function') {
+					// 登録されている関数を、パラメータを渡して実行
+					effectTable[type](params);
+				} else {
+					// 100種類以上の定義に含まれていない type が来た場合の安全弁
+					console.warn(`警告: 効果タイプ「${type}」は effectTable に定義されていません。`);
+				}
+			}
+		}
+		
+		/**
+		 * 確認ダイアログを挟んで編成画面に戻る
+		 */
+		function returnToFormationConfirm() {
+			if (confirm("シミュレーションを終了して編成画面に戻りますか？\n（現在の行動履歴は破棄されます）")) {
+				returnToFormation();
+			}
 		}
 		
 		/**
 		 * 編成画面に戻るための関数
 		 */
+		 
 		function returnToFormation() {
 			window.removeEventListener('keydown', handleKeyDown);
 			
@@ -1685,11 +1779,11 @@
 		 * 対象を選択した瞬間に、ActorのAV更新とTL上の位置移動を画面表示に反映させる
 		 */
 		function selectTarget(team, slotIndex, id, tp) {
-			if (!battleState.currentActor) return;
+			if (!battleState.actor) return;
 			if (id === null) return; // 空スロットは選択不可
 
 			// 相対フラグのチェック：Actorの所属チームと同じであればFriendであるため処理を拒否
-			if (battleState.currentActor.team === team) {
+			if (battleState.actor.team === team) {
 				return; 
 			}
 
@@ -1720,6 +1814,8 @@
 		function restoreStateFromSequence(index, autoSelectNext = false) {
 			if (index === -1) {
 				onBattleStart();
+				battleState.skillType = "BA";
+				updateSkillButtonUI();
 				return;
 			}
 			
@@ -1729,8 +1825,8 @@
 			
 			// 1. 内部データとしてActorのAVを更新（10000 / spd を加算）
 			const actor = battleState.timeline.find(node => 
-				node.team === battleState.currentActor.team && 
-				node.slotIndex === battleState.currentActor.slotIndex
+				node.team === battleState.actor.team && 
+				node.slotIndex === battleState.actor.slotIndex
 			);
 			if (actor) {
 				actor.av = 10000 / actor.spd;
@@ -1746,21 +1842,26 @@
 				battleState.timeline.forEach(node => {
 					node.av -= minAV;
 				});
-				battleState.currentActor = battleState.timeline[0];
+				battleState.actor = battleState.timeline[0];
 			}
 
-			// 4. 【要件1】ジャンプ時に「次の行動履歴」があればそれを参照して選択状態にする
+			// 4. ジャンプ時に「次の行動履歴」があればそれを参照して選択状態にする
 			if (autoSelectNext && index + 1 < historySequence.length) {
 				const nextHistory = historySequence[index + 1];
 				if (nextHistory && nextHistory.selectedTarget) {
 					// 次の履歴に記録されているターゲット情報をそのまま復元（ディープコピー）
 					battleState.selectedTarget = JSON.parse(JSON.stringify(nextHistory.selectedTarget));
+					battleState.skillType = nextHistory.skillType || "BA";
 				} else {
 					battleState.selectedTarget = null;
+					battleState.skillType = "BA";
 				}
 			} else {
 				battleState.selectedTarget = null;
+				battleState.skillType = "BA";
 			}
+			
+			updateSkillButtonUI();
 		}
 
 		/**
@@ -1795,10 +1896,9 @@
 
 		/**
 		 * 進むボタン：選択されたターゲットを確定し、ログを進める
-		 * 【修正】既存の次の行動と選択が一致していれば、以降のログを消さない
 		 */
 		function proceedTurnUI() {
-			if (!battleState.currentActor) return;
+			if (!battleState.actor) return;
 
 			// ターゲットが未選択（null）の場合は進行不可
 			if (!battleState.selectedTarget) {
@@ -1806,15 +1906,17 @@
 			}
 
 			let useExistingHistory = false;
+			const currentSkillType = battleState.skillType || "BA";
 
 			// もし現在地が過去であり、かつ「次の行動履歴」が存在する場合
 			if (historyIndex + 1 < historySequence.length) {
 				const nextHistory = historySequence[historyIndex + 1];
 				
-				// 【要件1】現在選択しているターゲットが、次の履歴のターゲットと一致しているか厳密に比較
+				// 現在選択しているターゲットが、次の履歴のターゲットと一致しているか厳密に比較
 				if (nextHistory && nextHistory.selectedTarget &&
 					nextHistory.selectedTarget.team === battleState.selectedTarget.team &&
-					nextHistory.selectedTarget.slotIndex === battleState.selectedTarget.slotIndex) {
+					nextHistory.selectedTarget.slotIndex === battleState.selectedTarget.slotIndex &&
+					(nextHistory.skillType || "BA") === currentSkillType) {
 					
 					// 一致しているため、以降のログを消さずにポインタを1つ進めるフラグを立てる
 					useExistingHistory = true;
@@ -1837,8 +1939,8 @@
 
 				// 1. 内部データとしてActorのAVを更新
 				const actor = battleState.timeline.find(node => 
-					node.team === battleState.currentActor.team && 
-					node.slotIndex === battleState.currentActor.slotIndex
+					node.team === battleState.actor.team && 
+					node.slotIndex === battleState.actor.slotIndex
 				);
 				if (actor) {
 					actor.av = 10000 / actor.spd;
@@ -1854,20 +1956,24 @@
 					battleState.timeline.forEach(node => {
 						node.av -= minAV;
 					});
-					battleState.currentActor = battleState.timeline[0];
+					battleState.actor = battleState.timeline[0];
 				}
+				
+				battleState.skillType = "BA";
 
 				// 4. 次のターンのターゲットを初期化（ただし、ここでも「さらに次の履歴」があれば自動選択）
 				if (historyIndex + 1 < historySequence.length) {
-					const nextNextHistory = historySequence[historyIndex + 1];
-					if (nextNextHistory && nextNextHistory.selectedTarget) {
-						battleState.selectedTarget = JSON.parse(JSON.stringify(nextNextHistory.selectedTarget));
+					const nextHistory = historySequence[historyIndex + 1];
+					if (nextHistory && nextHistory.selectedTarget) {
+						battleState.selectedTarget = JSON.parse(JSON.stringify(nextHistory.selectedTarget));
+						battleState.skillType = nextHistory.skillType || "BA";
 					} else {
 						battleState.selectedTarget = null;
 					}
 				} else {
 					battleState.selectedTarget = null;
 				}
+				updateSkillButtonUI();
 			}
 
 			// 5. 画面更新
@@ -1891,7 +1997,7 @@
 		 * 画面描画関数の修正（行動表の表示ロジック、および進むボタンの無効化処理を追加）
 		 */
 		function renderSimulationScreen() {
-			const currentActor = battleState.currentActor;
+			const currentActor = battleState.actor;
 
 			// ==================== 行動表（Action Log）の描画 ====================
 			const actionLogEl = document.getElementById('simActionLog');
@@ -1922,12 +2028,13 @@
 					activeItemEl = logItem;
 				}
 
-				const actorName = state.currentActor ? state.currentActor.name : 'Unknown';
+				const actorName = state.actor ? state.actor.name : 'Unknown';
 				const targetName = state.selectedTarget ? state.selectedTarget.id : 'None'; 
 				const targetUnit = ImportedUnitList.find(u => u.id === targetName);
-				const targetFullName = targetUnit ? targetUnit.name : 'Unknown';				
+				const targetFullName = targetUnit ? targetUnit.name : 'Unknown';
+				const loggedSkillType = state.skillType || "BA";
 
-				logItem.textContent = `${idx + 1}. ${actorName} → ${targetFullName}, BA`;
+				logItem.textContent = `${idx + 1}. ${actorName} → ${targetFullName}, ${loggedSkillType}`;
 				
 				logItem.onclick = () => jumpToHistoryStep(idx);
 				actionLogEl.appendChild(logItem);
