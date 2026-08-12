@@ -14973,17 +14973,17 @@ const mainInit = () => {
 		
 		//誤差表示(棒)
 		createDivCss2Label(`lblHitError`, g_lblNameObj.j_bar, {
-			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: (g_stateObj.autoAll !== C_FLG_OFF) ? 0 : 0.6, display: g_workObj.specialDisp,
+			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: 14, opacity: (g_stateObj.autoAll !== C_FLG_OFF) ? 0 : 0.6, display: g_workObj.specialDisp,
 		}),
 		
 		//推定Adj表示(棒)　※色はuwanとして出力される
 		createDivCss2Label(`lblEstAdj`, g_lblNameObj.j_bar, {
-			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: (g_stateObj.autoAll !== C_FLG_OFF) ? 0 : 0.85, display: g_workObj.specialDisp,
+			x: g_headerObj.playingWidth / 2, y: (g_sHeight + g_posObj.stepYR) / 2 - 80, w: 0, h: 20, siz: 14, opacity: (g_stateObj.autoAll !== C_FLG_OFF) ? 0 : 0.85, display: g_workObj.specialDisp,
 		}, g_cssObj.common_uwan),
 		
 		//W-Ratio表示 ※色はiiとして表示される
 		createDivCss2Label(`lblRatio`, `00.00%`, {
-			x: g_headerObj.playingWidth / 2 + 5 * 8, y: (g_sHeight + g_posObj.stepYR) / 2 - 98, w: 0, h: 20, siz: C_SIZ_MAIN, opacity: ( g_stateObj.autoAll !== C_FLG_OFF || g_stateObj.ratioType === C_FLG_OFF) ? 0 : 1,
+			x: g_headerObj.playingWidth / 2 + 5 * 8, y: (g_sHeight + g_posObj.stepYR) / 2 - 98, w: 0, h: 20, siz: 14, opacity: ( g_stateObj.autoAll !== C_FLG_OFF || g_stateObj.ratioType === C_FLG_OFF) ? 0 : 1,
 		}, (g_stateObj.ratioType === `W-Ratio`) ? g_cssObj.common_ii : ((g_stateObj.ratioType === `Gauge`) ? g_cssObj.common_shakin : g_cssObj.common_uwan)),
 
 		// 曲名・アーティスト名表示
@@ -17117,7 +17117,7 @@ function createErrorbar (_difFrame, checkFrz = false) {
 	if (g_stateObj.errorbar === `Type1`) {
 		infoSprite.appendChild(createDivCss2Label(`bar_${g_barNo}`, g_lblNameObj.j_bar, {
 			x: g_headerObj.playingWidth / 2 - 5 * _difFrame, y: (g_sHeight + g_posObj.stepYR) / 2 - 80,
-				w: 0, h: 20, siz: C_SIZ_MAIN, zIndex: frzDepth,
+				w: 0, h: 20, siz: 14, zIndex: frzDepth,
 				animationDuration: `1.5s`,
 				animationName: `fadeOut0`,
 				opacity: 0,
@@ -17133,7 +17133,7 @@ function createErrorbar (_difFrame, checkFrz = false) {
 		}
 		infoSprite.appendChild(createDivCss2Label(`bar`, g_lblNameObj.j_bar, {
 			x: g_headerObj.playingWidth / 2 - 5 * _difFrame, y: (g_sHeight + g_posObj.stepYR) / 2 - 80,
-				w: 0, h: 20, siz: C_SIZ_MAIN, zIndex: frzDepth,
+				w: 0, h: 20, siz: 14, zIndex: frzDepth,
 			}, g_cssObj[`common_${jdgColor}`])
 		);			
 	}
