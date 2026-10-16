@@ -8906,6 +8906,8 @@ const setReverseView = _btn => {
 	}
 };
 
+let g_firstGaugeFlg = true;
+
 /**
  * ゲージ設定メイン
  * @param {number} _scrollNum 
@@ -8967,6 +8969,14 @@ const setGauge = (_scrollNum, _gaugeInitFlg = false) => {
 
 	// ゲージ配列を入れ替え
 	g_settings.gauges = structuredClone(g_gaugeOptionObj[g_gaugeType.toLowerCase()]);
+	
+	// 起動後の最初の設定時のみ、customGauge指定の譜面では先頭のゲージを表示する
+	if (g_firstGaugeFlg) {
+		g_firstGaugeFlg = false;
+		if (g_gaugeType === C_LFE_CUSTOM) {
+			g_stateObj.gauge = g_settings.gauges[0];
+		}
+	}
 	g_settings.gaugeNum = getCurrentNo(g_settings.gauges, g_stateObj.gauge);
 	g_stateObj.gauge = g_settings.gauges[g_settings.gaugeNum];
 
